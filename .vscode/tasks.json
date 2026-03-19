@@ -1,0 +1,22 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "test-crm-flow-backend-start",
+			"type": "shell",
+			"command": "cd backend; node server.js",
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "test-crm-flow-frontend-dev",
+			"type": "shell",
+			"command": "cd frontend; npm test",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		}
+	]
+}
