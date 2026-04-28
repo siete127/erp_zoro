@@ -19,9 +19,18 @@ async def check_balance_availability(
     days_requested: float,
     year: int
 ) -> Dict[str, Any]:
-    """Verificar si el usuario tiene saldo suficiente"""
-
+    """Verificar disponibilidad de saldo para solicitar licencia."""
     try:
+        if days_requested <= 0:
+            return {
+                "available": False,
+                "reason": "Los días solicitados deben ser mayores a 0",
+                "days_requested": days_requested,
+            }
+
+        # Límite empresarial: máximo 5 días en negativo
+        max_negative_days = -5
+
         with get_connection() as conn:
             query = """
             SELECT 
@@ -46,33 +55,54 @@ async def check_balance_availability(
         if not row:
             return {
                 "available": False,
-                "reason": "No hay saldo registrado",
-                "days_remaining": 0
+                "reason": "No hay saldo registrado para este tipo de licencia",
+                "days_available": 0,
+                "days_used": 0,
+                "days_planned": 0,
+                "days_remaining": 0,
+                "days_requested": days_requested,
+                "remaining_after_request": 0,
+                "negative_allowed": False,
             }
 
-        available = float(row[0] or 0)
-        used = float(row[1] or 0)
-        planned = float(row[2] or 0)
+        available_days = float(row[0] or 0)
+        used_days = float(row[1] or 0)
+        planned_days = float(row[2] or 0)
         negative_allowed = bool(row[3])
 
-        remaining = available - used - planned
+        remaining = available_days - used_days - planned_days
+        remaining_after_request = remaining - days_requested
 
-        if negative_allowed:
+        if remaining_after_request >= 0:
             can_use = True
+            reason = "OK"
+        elif not negative_allowed:
+            can_use = False
+            reason = "Saldo insuficiente"
+        elif remaining_after_request < max_negative_days:
+            can_use = False
+            reason = f"Saldo negativo excede el máximo permitido de {abs(max_negative_days)} días"
         else:
-            can_use = remaining >= days_requested
+            can_use = True
+            reason = "OK con saldo negativo permitido"
 
         return {
             "available": can_use,
+            "reason": reason,
+            "days_available": available_days,
+            "days_used": used_days,
+            "days_planned": planned_days,
             "days_remaining": remaining,
             "days_requested": days_requested,
-            "negative_allowed": negative_allowed
+            "remaining_after_request": remaining_after_request,
+            "negative_allowed": negative_allowed,
+            "max_negative_days": max_negative_days,
         }
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error verificando saldo: {str(e)}"
+            detail=f"Error al verificar saldo: {str(e)}"
         )
 
 
