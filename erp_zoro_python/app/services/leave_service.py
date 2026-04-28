@@ -7,8 +7,36 @@ from sqlalchemy import text
 from fastapi import HTTPException, status
 
 from app.db.session import get_connection
+# ============================================================================
+# VALIDACIONES DE FECHAS
+# ============================================================================
+from datetime import date
 
 
+def validate_leave_dates(start_date: date, end_date: date):
+    today = date.today()
+
+    if start_date < today:
+        raise HTTPException(
+            status_code=400,
+            detail="No puedes solicitar vacaciones en fechas pasadas"
+        )
+
+    if end_date < start_date:
+        raise HTTPException(
+            status_code=400,
+            detail="La fecha fin no puede ser menor a la fecha inicio"
+        )
+
+    days = (end_date - start_date).days + 1
+
+    if days > 30:
+        raise HTTPException(
+            status_code=400,
+            detail="No puedes solicitar más de 30 días consecutivos"
+        )
+
+    return days
 # ============================================================================
 # BALANCE DE VACACIONES
 # ============================================================================

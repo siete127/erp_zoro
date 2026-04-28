@@ -14,7 +14,63 @@ from app.schemas.leave import (
 )
 import app.services.leave_service as leave_service
 router = APIRouter(prefix="/leave", tags=["HR - Leave Management"])
+# ============================================================================
+# LEAVE REQUESTS (SOLICITUDES DE VACACIONES)
+# ============================================================================
 
+from pydantic import BaseModel
+from datetime import date
+
+
+class LeaveRequestCreate(BaseModel):
+    user_id: int
+    leave_type_id: int
+    start_date: date
+    end_date: date
+
+
+@router.post("/requests")
+async def create_leave_request(
+    data: LeaveRequestCreate,
+    current_user=Depends(get_current_user)
+):
+    """
+    Crear solicitud de vacaciones
+    """
+
+    # 1. VALIDAR FECHAS
+    days_requested = leave_service.validate_leave_dates(
+        data.start_date,
+        data.end_date
+    )
+
+    # 2. VALIDAR TRASLAPES
+    await leave_service.validate_overlap(
+        data.user_id,
+        data.start_date,
+        data.end_date
+    )
+
+    # 3. VALIDAR SALDO
+    balance = await leave_service.check_balance_availability(
+        user_id=data.user_id,
+        leave_type_id=data.leave_type_id,
+        days_requested=days_requested,
+        year=data.start_date.year
+    )
+
+    if not balance["available"]:
+        raise HTTPException(
+            status_code=400,
+            detail=balance["reason"]
+        )
+
+    # 4. RESPUESTA (por ahora sin guardar en DB)
+    return {
+        "message": "Solicitud válida",
+        "days_requested": days_requested,
+        "balance_after": balance["remaining_after_request"]
+    }
 
 # ============================================================================
 # LEAVE TYPES ENDPOINTS
