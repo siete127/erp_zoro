@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import CreatableSelect from 'react-select/creatable';
+import VacacionesTab from './Vacaciones';
 import api from '../../services/api';
 import { rhService } from '../../services/rhService';
 import { notify } from '../../services/notify';
@@ -319,7 +320,8 @@ export default function RH() {
     { key: 'perfil', label: 'Perfil RH', helper: 'Datos generales, laborales y salud' },
     { key: 'contactos', label: 'Contactos', helper: 'Emergencia y respaldo familiar' },
     { key: 'cuentas', label: 'Cuentas', helper: 'Dispersión bancaria y titularidad' },
-    { key: 'documentos', label: 'Documentos', helper: 'Expediente digital del colaborador' }
+    { key: 'documentos', label: 'Documentos', helper: 'Expediente digital del colaborador' },
+    { key: 'vacaciones', label: '📅 Vacaciones', helper: 'Solicitud de descanso y vacaciones' }
   ];
 
   const expedienteStats = useMemo(() => ([
@@ -1169,7 +1171,7 @@ export default function RH() {
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-semibold text-slate-600">Numero de empleado</label>
-                          <input name="NumeroEmpleado" value={profileForm.NumeroEmpleado} onChange={handleProfileChange} placeholder="Ej. EMP-001" className={premiumFieldClass} />
+                          <input name="NumeroEmpleado" value={profileForm.NumeroEmpleado ?? ''} onChange={handleProfileChange} placeholder="Ej. EMP-001" className={premiumFieldClass} />
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-semibold text-slate-600">Puesto</label>
@@ -1181,7 +1183,7 @@ export default function RH() {
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-semibold text-slate-600">Fecha de ingreso</label>
-                          <input type="date" name="FechaIngreso" value={profileForm.FechaIngreso} onChange={handleProfileChange} className={premiumFieldClass} />
+                          <input type="date" name="FechaIngreso" value={profileForm.FechaIngreso ?? ''} onChange={handleProfileChange} className={premiumFieldClass} />
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-semibold text-slate-600">Tipo de contrato</label>
@@ -1189,7 +1191,7 @@ export default function RH() {
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-semibold text-slate-600">Salario mensual</label>
-                          <input type="number" step="0.01" name="SalarioMensual" value={profileForm.SalarioMensual} onChange={handleProfileChange} placeholder="0.00" className={premiumFieldClass} />
+                          <input type="number" step="0.01" name="SalarioMensual" value={profileForm.SalarioMensual ?? ''} onChange={handleProfileChange} placeholder="0.00" className={premiumFieldClass} />
                         </div>
                       </div>
                     </div>
@@ -1200,7 +1202,7 @@ export default function RH() {
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-semibold text-slate-600">Fecha de nacimiento</label>
-                          <input type="date" name="FechaNacimiento" value={profileForm.FechaNacimiento} onChange={handleProfileChange} className={premiumFieldClass} />
+                          <input type="date" name="FechaNacimiento" value={profileForm.FechaNacimiento ?? ''} onChange={handleProfileChange} className={premiumFieldClass} />
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-semibold text-slate-600">Estado civil</label>
@@ -1212,15 +1214,15 @@ export default function RH() {
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-semibold text-slate-600">CURP</label>
-                          <input name="CURP" value={profileForm.CURP} onChange={handleProfileChange} placeholder="18 caracteres" className={premiumFieldClass} />
+                          <input name="CURP" value={profileForm.CURP ?? ''} onChange={handleProfileChange} placeholder="18 caracteres" className={premiumFieldClass} />
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-semibold text-slate-600">RFC</label>
-                          <input name="RFC" value={profileForm.RFC} onChange={handleProfileChange} placeholder="RFC con homoclave" className={premiumFieldClass} />
+                          <input name="RFC" value={profileForm.RFC ?? ''} onChange={handleProfileChange} placeholder="RFC con homoclave" className={premiumFieldClass} />
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-semibold text-slate-600">NSS</label>
-                          <input name="NSS" value={profileForm.NSS} onChange={handleProfileChange} placeholder="Numero de seguridad social" className={premiumFieldClass} />
+                          <input name="NSS" value={profileForm.NSS ?? ''} onChange={handleProfileChange} placeholder="Numero de seguridad social" className={premiumFieldClass} />
                         </div>
                       </div>
                     </div>
@@ -1233,13 +1235,13 @@ export default function RH() {
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <div className="flex flex-col gap-1.5 md:col-span-2">
                           <label className="text-xs font-semibold text-slate-600">Direccion</label>
-                          <input name="Direccion" value={profileForm.Direccion} onChange={handleProfileChange} placeholder="Calle, numero, colonia" className={premiumFieldClass} />
+                          <input name="Direccion" value={profileForm.Direccion ?? ''} onChange={handleProfileChange} placeholder="Calle, numero, colonia" className={premiumFieldClass} />
                         </div>
                         <div className="flex flex-col gap-1.5 relative">
                           <label className="text-xs font-semibold text-slate-600">Codigo postal</label>
                           <input
                             name="CodigoPostal"
-                            value={profileForm.CodigoPostal}
+                            value={profileForm.CodigoPostal ?? ''}
                             onChange={handleCodigoPostalChange}
                             placeholder="5 digitos"
                             maxLength={5}
@@ -1258,7 +1260,7 @@ export default function RH() {
                           <label className="text-xs font-semibold text-slate-600">Ciudad</label>
                           <input
                             name="Ciudad"
-                            value={profileForm.Ciudad}
+                            value={profileForm.Ciudad ?? ''}
                             onChange={handleProfileChange}
                             placeholder={loadingCP ? 'Buscando...' : 'Ciudad'}
                             disabled={loadingCP}
@@ -1269,7 +1271,7 @@ export default function RH() {
                           <label className="text-xs font-semibold text-slate-600">Estado</label>
                           <input
                             name="Estado"
-                            value={profileForm.Estado}
+                            value={profileForm.Estado ?? ''}
                             onChange={handleProfileChange}
                             placeholder={loadingCP ? 'Buscando...' : 'Estado'}
                             disabled={loadingCP}
@@ -1285,11 +1287,11 @@ export default function RH() {
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <div className="flex flex-col gap-1.5 md:col-span-2">
                           <label className="text-xs font-semibold text-slate-600">Contacto de emergencia principal</label>
-                          <input name="ContactoEmergenciaPrincipal" value={profileForm.ContactoEmergenciaPrincipal} onChange={handleProfileChange} placeholder="Nombre del contacto" className={premiumFieldClass} />
+                          <input name="ContactoEmergenciaPrincipal" value={profileForm.ContactoEmergenciaPrincipal ?? ''} onChange={handleProfileChange} placeholder="Nombre del contacto" className={premiumFieldClass} />
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-semibold text-slate-600">Telefono de emergencia</label>
-                          <input name="TelefonoEmergenciaPrincipal" value={profileForm.TelefonoEmergenciaPrincipal} onChange={handleProfileChange} placeholder="+52 000 000 0000" className={premiumFieldClass} />
+                          <input name="TelefonoEmergenciaPrincipal" value={profileForm.TelefonoEmergenciaPrincipal ?? ''} onChange={handleProfileChange} placeholder="+52 000 000 0000" className={premiumFieldClass} />
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-semibold text-slate-600">Banco principal</label>
@@ -1297,15 +1299,15 @@ export default function RH() {
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-semibold text-slate-600">Numero de cuenta</label>
-                          <input name="NumeroCuentaPrincipal" value={profileForm.NumeroCuentaPrincipal} onChange={handleProfileChange} placeholder="16 digitos" className={premiumFieldClass} />
+                          <input name="NumeroCuentaPrincipal" value={profileForm.NumeroCuentaPrincipal ?? ''} onChange={handleProfileChange} placeholder="16 digitos" className={premiumFieldClass} />
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-semibold text-slate-600">CLABE interbancaria</label>
-                          <input name="CLABE" value={profileForm.CLABE} onChange={handleProfileChange} placeholder="18 digitos" className={premiumFieldClass} />
+                          <input name="CLABE" value={profileForm.CLABE ?? ''} onChange={handleProfileChange} placeholder="18 digitos" className={premiumFieldClass} />
                         </div>
                         <div className="flex flex-col gap-1.5 md:col-span-2">
                           <label className="text-xs font-semibold text-slate-600">Nombre del titular</label>
-                          <input name="NombreTitularCuenta" value={profileForm.NombreTitularCuenta} onChange={handleProfileChange} placeholder="Nombre como aparece en la cuenta" className={premiumFieldClass} />
+                          <input name="NombreTitularCuenta" value={profileForm.NombreTitularCuenta ?? ''} onChange={handleProfileChange} placeholder="Nombre como aparece en la cuenta" className={premiumFieldClass} />
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-semibold text-slate-600">Tipo de sangre</label>
@@ -1313,11 +1315,11 @@ export default function RH() {
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-semibold text-slate-600">Alergias</label>
-                          <input name="Alergias" value={profileForm.Alergias} onChange={handleProfileChange} placeholder="Describe alergias conocidas" className={premiumFieldClass} />
+                          <input name="Alergias" value={profileForm.Alergias ?? ''} onChange={handleProfileChange} placeholder="Describe alergias conocidas" className={premiumFieldClass} />
                         </div>
                         <div className="flex flex-col gap-1.5 md:col-span-2">
                           <label className="text-xs font-semibold text-slate-600">Notas medicas</label>
-                          <textarea name="NotasMedicas" value={profileForm.NotasMedicas} onChange={handleProfileChange} placeholder="Condiciones, medicamentos o indicaciones relevantes" className={`${premiumFieldClass} min-h-24 resize-none`} />
+                          <textarea name="NotasMedicas" value={profileForm.NotasMedicas ?? ''} onChange={handleProfileChange} placeholder="Condiciones, medicamentos o indicaciones relevantes" className={`${premiumFieldClass} min-h-24 resize-none`} />
                         </div>
                       </div>
                     </div>
@@ -1617,6 +1619,13 @@ export default function RH() {
                     {documentos.length === 0 && <p className="px-5 py-6 text-sm text-slate-500">Sin documentos cargados.</p>}
                   </div>
                 </div>
+              )}
+
+              {activeTab === 'vacaciones' && (
+                <VacacionesTab 
+                  currentUser={{ User_Id: selectedUserId, name: selectedUserLabel }}
+                  userCompanies={companies}
+                />
               )}
 
               </div>

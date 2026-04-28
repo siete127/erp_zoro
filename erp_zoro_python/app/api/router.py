@@ -27,7 +27,10 @@ from app.api.routes import (
     expenses,
     helpdesk,
     leads,
+    leave,
     mantenimiento,
+    payroll_integration,
+    rh_analytics,
     portal,
     proveedores,
     requisiciones,
@@ -100,6 +103,9 @@ api_router.include_router(crm.router, prefix="/crm", tags=["crm"])
 api_router.include_router(leads.router, prefix="/crm", tags=["crm-leads"])
 api_router.include_router(reporteria.router, prefix="/reporteria", tags=["reporteria"])
 api_router.include_router(rh.router, prefix="/rh", tags=["rh"])
+api_router.include_router(leave.router, prefix="/rh", tags=["rh-leave"])
+api_router.include_router(payroll_integration.router, prefix="/rh", tags=["rh-payroll"])
+api_router.include_router(rh_analytics.router, prefix="/rh", tags=["rh-analytics"])
 api_router.include_router(accounting.router, prefix="/accounting", tags=["accounting"])
 api_router.include_router(activos.router, prefix="/activos", tags=["activos"])
 api_router.include_router(password.router, prefix="/password", tags=["password"])

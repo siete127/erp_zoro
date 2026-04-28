@@ -48,6 +48,7 @@ import Aprobaciones from "./pages/aprobaciones/Aprobaciones";
 import Leads from "./pages/crm/Leads";
 import EquiposVenta from "./pages/crm/EquiposVenta";
 import Tareas from "./pages/tareas/Tareas";
+import CalendarioUsuarios from "./pages/tareas/CalendarioUsuarios";
 import Proyectos from "./pages/proyectos/Proyectos";
 import DetalleProyecto from "./pages/proyectos/DetalleProyecto";
 import Nomina from "./pages/nomina/Nomina";
@@ -163,6 +164,7 @@ function App() {
           <Route path="/aprobaciones" element={<Aprobaciones />} />
           <Route path="/compras/:id" element={<DetalleOrdenCompra />} />
           <Route path="/tareas" element={<Tareas />} />
+          <Route path="/tareas/calendario" element={<CalendarioUsuarios />} />
           <Route path="/proyectos" element={<Proyectos />} />
           <Route path="/proyectos/:id" element={<DetalleProyecto />} />
           <Route path="/nomina" element={<Nomina />} />

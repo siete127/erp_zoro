@@ -69,3 +69,31 @@ class CuentaBancariaUpdate(BaseModel):
     Moneda: Optional[str] = None
     EsPrincipal: Optional[bool] = False
     NombreTitular: Optional[str] = None
+
+
+# ── Vacaciones ───────────────────────────────────────────────────────────────
+
+
+class VacacionesCreate(BaseModel):
+    """Crear solicitud de vacaciones."""
+    FechaInicio: str  # YYYY-MM-DD
+    FechaFin: str  # YYYY-MM-DD
+    Cantidad: int  # Número de días
+    Razon: Optional[str] = None
+    Observaciones: Optional[str] = None
+
+
+class VacacionesUpdate(BaseModel):
+    """Actualizar solicitud de vacaciones."""
+    FechaInicio: Optional[str] = None
+    FechaFin: Optional[str] = None
+    Cantidad: Optional[int] = None
+    Razon: Optional[str] = None
+    Observaciones: Optional[str] = None
+    Estatus: Optional[str] = None  # "Pendiente", "Aprobado", "Rechazado"
+
+
+class VacacionesAprobacion(BaseModel):
+    """Aprobar/Rechazar solicitud de vacaciones."""
+    Estatus: str  # "Aprobado" o "Rechazado"
+    Observaciones: Optional[str] = None

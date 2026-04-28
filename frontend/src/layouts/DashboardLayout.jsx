@@ -106,6 +106,7 @@ const navItems = [
   },
   { key: "aprobaciones", to: "/aprobaciones", label: "Aprobaciones", icon: FaClipboardList },
   { key: "tareas", to: "/tareas", label: "Tareas", icon: FaTasks },
+  { key: "tareas-calendario", to: "/tareas/calendario", label: "Calendario", icon: FaCalendarCheck },
   { key: "projects", permissionKey: "projects", to: "/proyectos", label: "Proyectos", icon: FaFolderOpen },
   { key: "nomina", permissionKey: "rh", to: "/nomina", label: "N\u00f3mina", icon: FaMoneyCheckAlt },
   { key: "asistencia", permissionKey: "rh", to: "/asistencia", label: "Asistencia", icon: FaCalendarCheck },

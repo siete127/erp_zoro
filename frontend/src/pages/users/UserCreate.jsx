@@ -459,78 +459,78 @@ export default function UserCreate({ onCreated, editMode = false, initialData = 
   };
 
   return (
-    <div className="w-full max-h-[95vh] bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
-      <div className="bg-[#092052] px-6 py-4 flex-shrink-0">
-        <h2 className="text-2xl font-bold text-white">{editMode ? 'Editar Usuario' : 'Crear Usuario'}</h2>
+    <div className="w-full max-h-[95vh] overflow-hidden rounded-[20px] shadow-[0_24px_64px_rgba(10,20,50,0.22)] flex flex-col">
+      <div className="bg-gradient-to-r from-[#1b3d86] to-[#2a5fc4] px-6 py-4 flex-shrink-0">
+        <h2 className="text-lg font-bold text-white">{editMode ? 'Editar Usuario' : 'Crear Usuario'}</h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        <form id="userForm" onSubmit={handleSubmit} className="p-6 pb-24 space-y-6" noValidate>
+      <div className="flex-1 overflow-y-auto bg-white">
+        <form id="userForm" onSubmit={handleSubmit} className="p-6 pb-24 space-y-5" noValidate>
           {/* Información Personal */}
-          <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 space-y-4">
-            <h3 className="text-sm font-bold text-gray-900">Información Personal</h3>
+          <div className="rounded-[16px] border border-[#dce4f0] bg-[#f8faff] p-4 space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-[#3b6fd4]">Información Personal</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="Name" className="block text-xs font-semibold text-gray-700 mb-1">Nombre *</label>
-                <input id="Name" name="Name" type="text" value={form.Name} onChange={handleChange} required aria-invalid={!!errors.Name} className="w-full h-9 px-3 text-sm rounded-lg border-2 border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
+                <label htmlFor="Name" className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7a96]">Nombre *</label>
+                <input id="Name" name="Name" type="text" value={form.Name} onChange={handleChange} required aria-invalid={!!errors.Name} className="w-full rounded-[12px] border border-[#dce4f0] bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.06)] outline-none focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
                 {errors.Name && <p className="mt-1 text-xs text-red-600">{errors.Name}</p>}
               </div>
               <div>
-                <label htmlFor="Lastname" className="block text-xs font-semibold text-gray-700 mb-1">Apellido *</label>
-                <input id="Lastname" name="Lastname" type="text" value={form.Lastname} onChange={handleChange} required aria-invalid={!!errors.Lastname} className="w-full h-9 px-3 text-sm rounded-lg border-2 border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
+                <label htmlFor="Lastname" className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7a96]">Apellido *</label>
+                <input id="Lastname" name="Lastname" type="text" value={form.Lastname} onChange={handleChange} required aria-invalid={!!errors.Lastname} className="w-full rounded-[12px] border border-[#dce4f0] bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.06)] outline-none focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
                 {errors.Lastname && <p className="mt-1 text-xs text-red-600">{errors.Lastname}</p>}
               </div>
               <div>
-                <label htmlFor="Email" className="block text-xs font-semibold text-gray-700 mb-1">Email</label>
-                <input id="Email" name="Email" type="email" value={form.Email} onChange={handleChange} aria-invalid={!!errors.Email} className="w-full h-9 px-3 text-sm rounded-lg border-2 border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
+                <label htmlFor="Email" className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7a96]">Email</label>
+                <input id="Email" name="Email" type="email" value={form.Email} onChange={handleChange} aria-invalid={!!errors.Email} className="w-full rounded-[12px] border border-[#dce4f0] bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.06)] outline-none focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
                 {errors.Email && <p className="mt-1 text-xs text-red-600">{errors.Email}</p>}
               </div>
               <div>
-                <label htmlFor="Area" className="block text-xs font-semibold text-gray-700 mb-1">Área</label>
-                <input id="Area" name="Area" type="text" value={form.Area} onChange={handleChange} className="w-full h-9 px-3 text-sm rounded-lg border-2 border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
+                <label htmlFor="Area" className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7a96]">Área</label>
+                <input id="Area" name="Area" type="text" value={form.Area} onChange={handleChange} className="w-full rounded-[12px] border border-[#dce4f0] bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.06)] outline-none focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
               </div>
             </div>
           </div>
 
           {/* Teléfono */}
-          <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 space-y-3">
-            <h3 className="text-sm font-bold text-gray-900">Contacto</h3>
+          <div className="rounded-[16px] border border-[#dce4f0] bg-[#f8faff] p-4 space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-[#3b6fd4]">Contacto</h3>
             <div>
-              <label htmlFor="PhoneNumberLocal" className="block text-xs font-semibold text-gray-700 mb-2">Teléfono</label>
+              <label htmlFor="PhoneNumberLocal" className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7a96]">Teléfono</label>
               <div className="flex items-center gap-2">
-                <select aria-label="País" value={countryDial} onChange={handleCountryChange} className="h-9 px-2 text-sm rounded-lg border-2 border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]">
+                <select aria-label="País" value={countryDial} onChange={handleCountryChange} className="rounded-[12px] border border-[#dce4f0] bg-white px-3 py-2.5 text-sm text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.06)] outline-none focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20">
                   <option value="+52">México (+52)</option>
                   <option value="+1">USA (+1)</option>
                   <option value="+34">España (+34)</option>
                   <option value="+57">Colombia (+57)</option>
                   <option value="+44">Reino Unido (+44)</option>
                 </select>
-                <input id="PhoneNumberLocal" name="PhoneNumberLocal" type="text" value={phoneLocal} onChange={handlePhoneLocalChange} aria-invalid={!!errors.PhoneNumber} placeholder="Ej. 5584473337" className="flex-1 h-9 px-3 text-sm rounded-lg border-2 border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
+                <input id="PhoneNumberLocal" name="PhoneNumberLocal" type="text" value={phoneLocal} onChange={handlePhoneLocalChange} aria-invalid={!!errors.PhoneNumber} placeholder="Ej. 5584473337" className="flex-1 rounded-[12px] border border-[#dce4f0] bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.06)] outline-none focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
               </div>
-              <p className="mt-1 text-xs text-gray-500">Prefijo por defecto: <strong>+52</strong></p>
+              <p className="mt-1 text-xs text-slate-400">Prefijo por defecto: <strong>+52</strong></p>
               {errors.PhoneNumber && <p className="mt-1 text-xs text-red-600">{errors.PhoneNumber}</p>}
             </div>
           </div>
 
           {/* Credenciales */}
-          <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 space-y-4">
-            <h3 className="text-sm font-bold text-gray-900">Credenciales</h3>
+          <div className="rounded-[16px] border border-[#dce4f0] bg-[#f8faff] p-4 space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-[#3b6fd4]">Credenciales</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="Username" className="block text-xs font-semibold text-gray-700 mb-1">Usuario *</label>
-                <input id="Username" name="Username" type="text" value={form.Username} onChange={handleChange} required aria-invalid={!!errors.Username} className="w-full h-9 px-3 text-sm rounded-lg border-2 border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
+                <label htmlFor="Username" className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7a96]">Usuario *</label>
+                <input id="Username" name="Username" type="text" value={form.Username} onChange={handleChange} required aria-invalid={!!errors.Username} className="w-full rounded-[12px] border border-[#dce4f0] bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.06)] outline-none focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
                 {errors.Username && <p className="mt-1 text-xs text-red-600">{errors.Username}</p>}
               </div>
               {!editMode && (
                 <>
                   <div>
-                    <label htmlFor="Password" className="block text-xs font-semibold text-gray-700 mb-1">Contraseña *</label>
-                    <input id="Password" name="Password" type="password" value={form.Password} onChange={handleChange} required aria-invalid={!!errors.Password} className="w-full h-9 px-3 text-sm rounded-lg border-2 border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
-                    {errors.Password ? <p className="mt-1 text-xs text-red-600">{errors.Password}</p> : <p className="mt-1 text-xs text-gray-500">Min. 12 caracteres, mayús, minús, número y símbolo</p>}
+                    <label htmlFor="Password" className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7a96]">Contraseña *</label>
+                    <input id="Password" name="Password" type="password" value={form.Password} onChange={handleChange} required aria-invalid={!!errors.Password} className="w-full rounded-[12px] border border-[#dce4f0] bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.06)] outline-none focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
+                    {errors.Password ? <p className="mt-1 text-xs text-red-600">{errors.Password}</p> : <p className="mt-1 text-xs text-slate-400">Min. 12 caracteres, mayús, minús, número y símbolo</p>}
                   </div>
                   <div>
-                    <label htmlFor="ConfirmPassword" className="block text-xs font-semibold text-gray-700 mb-1">Confirmar Contraseña *</label>
-                    <input id="ConfirmPassword" name="ConfirmPassword" type="password" value={form.ConfirmPassword} onChange={handleChange} required aria-invalid={!!errors.ConfirmPassword} className="w-full h-9 px-3 text-sm rounded-lg border-2 border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
+                    <label htmlFor="ConfirmPassword" className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7a96]">Confirmar Contraseña *</label>
+                    <input id="ConfirmPassword" name="ConfirmPassword" type="password" value={form.ConfirmPassword} onChange={handleChange} required aria-invalid={!!errors.ConfirmPassword} className="w-full rounded-[12px] border border-[#dce4f0] bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.06)] outline-none focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
                     {errors.ConfirmPassword && <p className="mt-1 text-xs text-red-600">{errors.ConfirmPassword}</p>}
                   </div>
                 </>
@@ -539,44 +539,44 @@ export default function UserCreate({ onCreated, editMode = false, initialData = 
           </div>
 
           {/* Rol y Estado */}
-          <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 space-y-4">
-            <h3 className="text-sm font-bold text-gray-900">Configuración</h3>
+          <div className="rounded-[16px] border border-[#dce4f0] bg-[#f8faff] p-4 space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-[#3b6fd4]">Configuración</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="RolId" className="block text-xs font-semibold text-gray-700 mb-1">Rol *</label>
+                <label htmlFor="RolId" className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7a96]">Rol *</label>
                 {isFixedAdmin ? (
                   <div>
-                    <div className="w-full h-9 px-3 text-sm rounded-lg border-2 border-gray-200 bg-gray-100 text-gray-500 flex items-center gap-2 cursor-not-allowed">
+                    <div className="w-full rounded-[12px] border border-[#dce4f0] bg-slate-50 px-3.5 py-2.5 text-sm text-slate-400 flex items-center gap-2 cursor-not-allowed">
                       <span>Admin fijo</span>
-                      <span className="text-xs bg-gray-300 text-gray-600 px-1.5 py-0.5 rounded-full">Protegido</span>
+                      <span className="text-[10px] border border-slate-200 bg-white text-slate-500 px-1.5 py-0.5 rounded-full">Protegido</span>
                     </div>
-                    <p className="mt-1 text-xs text-gray-400">Este usuario conserva el rol Admin fijo y no se le puede cambiar desde aquí.</p>
+                    <p className="mt-1 text-xs text-slate-400">Este usuario conserva el rol Admin fijo y no se le puede cambiar desde aquí.</p>
                   </div>
                 ) : (
                   <div>
-                    <select id="RolId" name="RolId" value={form.RolId} onChange={handleChange} required aria-invalid={!!errors.RolId} className="w-full h-9 px-3 text-sm rounded-lg border-2 border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]">
+                    <select id="RolId" name="RolId" value={form.RolId} onChange={handleChange} required aria-invalid={!!errors.RolId} className="w-full rounded-[12px] border border-[#dce4f0] bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.06)] outline-none focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20">
                       <option value="">Selecciona un rol</option>
                       {roles.map((r) => (
                         <option key={r.Rol_Id ?? r.RolId ?? r.id} value={r.Rol_Id ?? r.RolId ?? r.id}>{r.Name}</option>
                       ))}
                     </select>
                     {errors.RolId && <p className="mt-1 text-xs text-red-600">{errors.RolId}</p>}
-                    <p className="mt-1 text-xs text-gray-500">El rol Admin sigue disponible para usuarios editables. SuperAdmin no se puede asignar desde este formulario.</p>
+                    <p className="mt-1 text-xs text-slate-400">El rol Admin sigue disponible para usuarios editables. SuperAdmin no se puede asignar desde este formulario.</p>
                   </div>
                 )}
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-semibold text-gray-700 mb-2">Empresas</label>
+                <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7a96]">Empresas</label>
                 <div className="grid grid-cols-2 gap-2">
                   {companies.map((c) => (
-                    <label key={c.Company_Id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-100 p-2 rounded">
+                    <label key={c.Company_Id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-[#f0f4ff] p-2 rounded-[8px] transition">
                       <input
                         type="checkbox"
                         name="Company_Ids"
                         value={c.Company_Id}
                         checked={form.Company_Ids.includes(c.Company_Id)}
                         onChange={handleChange}
-                        className="h-4 w-4 text-[#092052] border-gray-300 rounded"
+                        className="h-4 w-4 rounded accent-[#1b3d86]"
                       />
                       <span className="text-gray-700">{c.NameCompany}</span>
                     </label>
@@ -584,7 +584,7 @@ export default function UserCreate({ onCreated, editMode = false, initialData = 
                 </div>
               </div>
               <div className="flex items-center space-x-3">
-                <input id="IsActive" name="IsActive" type="checkbox" checked={form.IsActive} onChange={handleChange} className="h-4 w-4 text-[#092052] border-gray-300 rounded" />
+                <input id="IsActive" name="IsActive" type="checkbox" checked={form.IsActive} onChange={handleChange} className="h-4 w-4 rounded accent-[#1b3d86]" />
                 <label htmlFor="IsActive" className="text-xs font-semibold text-gray-700">Activo</label>
               </div>
             </div>
@@ -592,7 +592,7 @@ export default function UserCreate({ onCreated, editMode = false, initialData = 
 
           {/* Permisos de acceso — solo en creación */}
           {!editMode && (
-            <div className={`rounded-lg border-2 p-4 space-y-4 ${modulosActivos.size === 0 ? 'border-red-300 bg-red-50' : 'border-blue-200 bg-blue-50'}`}>
+            <div className={`rounded-[16px] border-2 p-4 space-y-4 ${modulosActivos.size === 0 ? 'border-rose-300 bg-rose-50' : 'border-[#3b6fd4]/30 bg-[#f0f8ff]'}`}>
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-bold text-gray-900">
@@ -605,12 +605,12 @@ export default function UserCreate({ onCreated, editMode = false, initialData = 
                   </p>
                 </div>
                 {modulosActivos.size === 0 && (
-                  <span className="text-xs font-semibold text-red-600 bg-red-100 border border-red-300 px-2 py-1 rounded-full">
+                  <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700">
                     Requerido
                   </span>
                 )}
                 {modulosActivos.size > 0 && (
-                  <span className="text-xs font-semibold text-green-700 bg-green-100 border border-green-300 px-2 py-1 rounded-full">
+                  <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
                     ✓ Listo
                   </span>
                 )}
@@ -633,19 +633,19 @@ export default function UserCreate({ onCreated, editMode = false, initialData = 
                       key={p.id}
                       type="button"
                       onClick={() => togglePerfil(p.id)}
-                      className={`relative text-left p-3 rounded-lg border-2 transition-all ${
+                      className={`relative text-left p-3 rounded-[14px] border-2 transition-all ${
                         activo
-                          ? 'border-blue-500 bg-blue-50 shadow-sm'
-                          : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/40'
+                          ? 'border-[#1b3d86] bg-[#f0f4ff] shadow-[0_2px_8px_rgba(27,61,134,0.15)]'
+                          : 'border-[#dce4f0] bg-white hover:border-[#3b6fd4] hover:bg-[#f8faff]'
                       }`}
                     >
                       {activo && (
-                        <span className="absolute top-1.5 right-1.5 text-xs bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center font-bold">✓</span>
+                        <span className="absolute top-1.5 right-1.5 text-[10px] bg-emerald-500 text-white rounded-full w-4 h-4 flex items-center justify-center font-bold">✓</span>
                       )}
                       <div className="text-xl mb-1">{p.icono}</div>
-                      <div className="text-xs font-bold text-gray-900">{p.nombre}</div>
-                      <div className="text-[10px] text-gray-500 mt-0.5 leading-tight">{p.descripcion}</div>
-                      <div className="text-[10px] text-blue-600 mt-1">{p.modulos.length} módulos</div>
+                      <div className="text-xs font-bold text-slate-800">{p.nombre}</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5 leading-tight">{p.descripcion}</div>
+                      <div className="text-[10px] text-[#3b6fd4] mt-1">{p.modulos.length} módulos</div>
                     </button>
                   );
                 })}
@@ -671,7 +671,7 @@ export default function UserCreate({ onCreated, editMode = false, initialData = 
                         <label
                           key={m.key}
                           className={`flex items-center gap-2 text-xs cursor-pointer p-1.5 rounded border transition-colors ${
-                            active ? 'border-blue-300 bg-blue-50' : 'border-transparent hover:bg-gray-100'
+                            active ? 'border-[#3b6fd4]/30 bg-[#f0f4ff]' : 'border-transparent hover:bg-[#f8faff]'
                           }`}
                         >
                           <input
@@ -718,15 +718,20 @@ export default function UserCreate({ onCreated, editMode = false, initialData = 
       </div>
 
       {/* Footer con botones fijos */}
-      <div className="flex-shrink-0 border-t border-gray-200 bg-white px-6 py-4 flex gap-3">
-        <button type="button" onClick={onCancel} className="flex-1 h-10 bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold rounded-lg transition-all">
+      <div className="flex-shrink-0 border-t border-[#eaf0fa] bg-white px-6 py-4 flex gap-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-1 rounded-[12px] border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
+        >
           Cancelar
         </button>
         <button
           type="submit"
           form="userForm"
           disabled={loading || !isFormValid()}
-          className="flex-1 h-10 bg-[#092052] hover:bg-[#0d3a7a] text-white font-bold rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+          className="flex-1 rounded-[12px] bg-gradient-to-r from-[#1b3d86] to-[#2a5fc4] py-2.5 text-sm font-bold text-white shadow-[0_4px_14px_rgba(27,61,134,0.30)] disabled:opacity-50 disabled:cursor-not-allowed transition"
+        >
           {loading ? (editMode ? 'Guardando...' : 'Creando...') : (editMode ? 'Guardar cambios' : 'Crear Usuario')}
         </button>
       </div>

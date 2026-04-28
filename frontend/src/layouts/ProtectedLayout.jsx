@@ -57,9 +57,9 @@ export default function ProtectedLayout() {
     : location.pathname.startsWith('/superadmin/')
     ? (titlesByPath[location.pathname] ?? "SuperAdmin")
     : (titlesByPath[location.pathname] ?? "Panel");
-  const fullWidthPages = ['/users', '/rh', '/clients', '/productos', '/productos/importar', '/productos/almacenes', '/productos/inventario', '/productos/recepcion-pendiente', '/productos/movimientos', '/productos/transferencias', '/productos/lotes', '/productos/precios', '/ventas', '/ventas/nueva', '/crm/oportunidades', '/crm/leads', '/crm/equipos', '/produccion/ordenes', '/configuracion', '/reporteria', '/notas-credito', '/complementos-pago', '/licencias', '/auditoria', '/nomina', '/asistencia', '/superadmin/empresas', '/superadmin/dashboard', '/superadmin/admins', '/superadmin/permisos','/compras/requisiciones', '/compras/proveedores', '/aprobaciones', '/proyectos', '/contabilidad/activos-fijos', '/timesheets', '/mantenimiento', '/helpdesk', '/gastos', '/website', '/marketing', '/flotilla', '/encuestas', '/suscripciones'];
-  const fullWidthPagesExtended = [...fullWidthPages, '/compras'];
-  const isUsers = fullWidthPagesExtended.includes(location.pathname) || location.pathname.startsWith('/proyectos/') || location.pathname.startsWith('/superadmin/');
+  const fullWidthPages = ['/users', '/rh', '/clients', '/productos', '/productos/importar', '/productos/almacenes', '/productos/inventario', '/productos/recepcion-pendiente', '/productos/movimientos', '/productos/transferencias', '/productos/lotes', '/productos/precios', '/ventas', '/ventas/nueva', '/crm/oportunidades', '/crm/leads', '/crm/equipos', '/configuracion', '/reporteria', '/notas-credito', '/complementos-pago', '/licencias', '/auditoria', '/nomina', '/asistencia', '/superadmin/empresas', '/superadmin/dashboard', '/superadmin/admins', '/superadmin/permisos','/compras', '/compras/nueva', '/compras/requisiciones', '/compras/proveedores', '/aprobaciones', '/proyectos', '/contabilidad/activos-fijos', '/timesheets', '/mantenimiento', '/helpdesk', '/gastos', '/website', '/marketing', '/flotilla', '/encuestas', '/suscripciones', '/tareas', '/tareas/calendario'];
+  const fullWidthPrefixes = ['/proyectos/', '/superadmin/', '/produccion/bom', '/produccion/materias-primas', '/produccion/ordenes/', '/compras/'];
+  const isUsers = fullWidthPages.includes(location.pathname) || fullWidthPrefixes.some((prefix) => location.pathname.startsWith(prefix));
 
   const routePermissions = {
     '/dashboard': 'dashboard',

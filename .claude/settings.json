@@ -42,7 +42,12 @@
       "Bash(sed \"s/\\).*//\")",
       "Bash(npm run *)",
       "Bash(node -e \"const fs=require\\('fs'\\); const buf=fs.readFileSync\\('src/layouts/DashboardLayout.jsx'\\); const str=buf.toString\\('utf8'\\); const idx=str.indexOf\\('rdenes'\\); console.log\\('Context:', JSON.stringify\\(str.slice\\(idx-3,idx+12\\)\\)\\); const idx2=str.indexOf\\('roducci'\\); console.log\\('Context2:', JSON.stringify\\(str.slice\\(idx2-3,idx2+15\\)\\)\\);\")",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(python -c \"from app.api.router import api_router; print\\('OK'\\)\")",
+      "Bash(python -c \"from app.api.routes.rh import router; print\\('rh.py OK'\\)\")",
+      "Bash(python -c \"from app.api.routes.payroll_integration import router; print\\('payroll_integration.py OK'\\)\")",
+      "Bash(python -c \"from app.api.router import api_router; print\\('Full router OK'\\)\")",
+      "Bash(npx tsc *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\diazj\\.claude\\projects\\c--Users-diazj-OneDrive-Escritorio-ERP-PROYECTO\\memory",

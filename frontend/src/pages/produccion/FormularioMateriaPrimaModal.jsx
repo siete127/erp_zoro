@@ -1,24 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { FaSave } from 'react-icons/fa';
+import { operationFieldClass, operationPrimaryButtonClass, operationSecondaryButtonClass } from '../../components/operation/OperationUI';
 import * as materiaPrimaService from '../../services/materiaPrimaService';
 import { notify } from '../../services/notify';
+
+const initialForm = {
+  Codigo: '',
+  Nombre: '',
+  Descripcion: '',
+  Tipo: 'PAPEL',
+  UnidadCompra: 'TONELADA',
+  UnidadConsumo: 'KG',
+  FactorConversion: 1000,
+  Gramaje: '',
+  CostoUnitario: 0,
+  Moneda: 'MXN',
+  Activo: true,
+};
+
+function Field({ label, hint, children, span = false }) {
+  return (
+    <div className={span ? 'md:col-span-2' : ''}>
+      <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7a96]">{label}</label>
+      {children}
+      {hint ? <p className="mt-1 text-xs text-slate-400">{hint}</p> : null}
+    </div>
+  );
+}
 
 const FormularioMateriaPrimaModal = ({ id, onClose }) => {
   const isEdit = !!id;
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    Codigo: '',
-    Nombre: '',
-    Descripcion: '',
-    Tipo: 'PAPEL',
-    UnidadCompra: 'TONELADA',
-    UnidadConsumo: 'KG',
-    FactorConversion: 1000,
-    Gramaje: '',
-    CostoUnitario: 0,
-    Moneda: 'MXN',
-    Activo: true
-  });
+  const [formData, setFormData] = useState(initialForm);
 
   useEffect(() => {
     if (isEdit) {
@@ -30,7 +43,7 @@ const FormularioMateriaPrimaModal = ({ id, onClose }) => {
     try {
       setLoading(true);
       const response = await materiaPrimaService.getMateriaPrimaDetalle(id);
-      setFormData(response.data);
+      setFormData({ ...initialForm, ...response.data });
     } catch (error) {
       console.error('Error al cargar materia prima:', error);
       notify('Error al cargar materia prima', 'error');
@@ -39,9 +52,9 @@ const FormularioMateriaPrimaModal = ({ id, onClose }) => {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
     try {
       setLoading(true);
       if (isEdit) {
@@ -61,51 +74,47 @@ const FormularioMateriaPrimaModal = ({ id, onClose }) => {
   };
 
   if (loading && isEdit) {
-    return <div className="text-center py-8">Cargando...</div>;
+    return <div className="py-10 text-center text-sm text-slate-500">Cargando...</div>;
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Código *</label>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field label="Código *" hint="Ejemplo: MP-001 o PAP-120.">
           <input
             type="text"
             value={formData.Codigo}
             onChange={(e) => setFormData({ ...formData, Codigo: e.target.value })}
-            className="w-full border rounded px-3 py-2"
-            placeholder="Ej: MP-001, ADH-001"
+            className={operationFieldClass}
+            placeholder="MP-001"
             required
           />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium mb-1">Nombre *</label>
+        </Field>
+
+        <Field label="Nombre *">
           <input
             type="text"
             value={formData.Nombre}
             onChange={(e) => setFormData({ ...formData, Nombre: e.target.value })}
-            className="w-full border rounded px-3 py-2"
+            className={operationFieldClass}
             required
           />
-        </div>
-        
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium mb-1">Descripción</label>
+        </Field>
+
+        <Field label="Descripción" span>
           <textarea
             value={formData.Descripcion}
             onChange={(e) => setFormData({ ...formData, Descripcion: e.target.value })}
-            className="w-full border rounded px-3 py-2"
-            rows="2"
+            className={`${operationFieldClass} resize-none`}
+            rows="3"
           />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium mb-1">Tipo *</label>
+        </Field>
+
+        <Field label="Tipo *">
           <select
             value={formData.Tipo}
             onChange={(e) => setFormData({ ...formData, Tipo: e.target.value })}
-            className="w-full border rounded px-3 py-2"
+            className={operationFieldClass}
             required
           >
             <option value="PAPEL">Papel</option>
@@ -113,14 +122,13 @@ const FormularioMateriaPrimaModal = ({ id, onClose }) => {
             <option value="REVENTA">Reventa</option>
             <option value="OTRO">Otro</option>
           </select>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium mb-1">Unidad de Compra *</label>
+        </Field>
+
+        <Field label="Unidad de compra *">
           <select
             value={formData.UnidadCompra}
             onChange={(e) => setFormData({ ...formData, UnidadCompra: e.target.value })}
-            className="w-full border rounded px-3 py-2"
+            className={operationFieldClass}
             required
           >
             <option value="TONELADA">Tonelada</option>
@@ -131,14 +139,13 @@ const FormularioMateriaPrimaModal = ({ id, onClose }) => {
             <option value="ROLLO">Rollo</option>
             <option value="CAJA">Caja</option>
           </select>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium mb-1">Unidad de Consumo *</label>
+        </Field>
+
+        <Field label="Unidad de consumo *">
           <select
             value={formData.UnidadConsumo}
             onChange={(e) => setFormData({ ...formData, UnidadConsumo: e.target.value })}
-            className="w-full border rounded px-3 py-2"
+            className={operationFieldClass}
             required
           >
             <option value="KG">Kilogramo (KG)</option>
@@ -148,93 +155,75 @@ const FormularioMateriaPrimaModal = ({ id, onClose }) => {
             <option value="PIEZA">Pieza</option>
             <option value="METRO">Metro</option>
           </select>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium mb-1">Factor de Conversión *</label>
+        </Field>
+
+        <Field label="Factor de conversión *" hint="Ejemplo: 1 tonelada = 1000 KG.">
           <input
             type="number"
             value={formData.FactorConversion}
             onChange={(e) => setFormData({ ...formData, FactorConversion: parseFloat(e.target.value) })}
-            className="w-full border rounded px-3 py-2"
+            className={operationFieldClass}
             step="0.001"
             min="0"
             required
           />
-          <p className="text-xs text-gray-500 mt-1">
-            Ej: 1 Tonelada = 1000 KG
-          </p>
-        </div>
-        
-        {formData.Tipo === 'PAPEL' && (
-          <div>
-            <label className="block text-sm font-medium mb-1">Gramaje (g/m²)</label>
+        </Field>
+
+        {formData.Tipo === 'PAPEL' ? (
+          <Field label="Gramaje (g/m²)">
             <input
               type="number"
               value={formData.Gramaje}
               onChange={(e) => setFormData({ ...formData, Gramaje: parseFloat(e.target.value) })}
-              className="w-full border rounded px-3 py-2"
+              className={operationFieldClass}
               step="0.01"
               min="0"
             />
-          </div>
-        )}
-        
-        <div>
-          <label className="block text-sm font-medium mb-1">Costo Unitario *</label>
+          </Field>
+        ) : null}
+
+        <Field label="Costo unitario *" hint={`Costo por ${formData.UnidadConsumo}.`}>
           <input
             type="number"
             value={formData.CostoUnitario}
             onChange={(e) => setFormData({ ...formData, CostoUnitario: parseFloat(e.target.value) })}
-            className="w-full border rounded px-3 py-2"
+            className={operationFieldClass}
             step="0.01"
             min="0"
             required
           />
-          <p className="text-xs text-gray-500 mt-1">
-            Costo por {formData.UnidadConsumo}
-          </p>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium mb-1">Moneda</label>
+        </Field>
+
+        <Field label="Moneda">
           <select
             value={formData.Moneda}
             onChange={(e) => setFormData({ ...formData, Moneda: e.target.value })}
-            className="w-full border rounded px-3 py-2"
+            className={operationFieldClass}
           >
             <option value="MXN">MXN</option>
             <option value="USD">USD</option>
             <option value="EUR">EUR</option>
           </select>
-        </div>
-        
-        <div>
-          <label className="flex items-center gap-2">
+        </Field>
+
+        <div className="md:col-span-2">
+          <label className="inline-flex items-center gap-3 rounded-[18px] border border-[#dce4f0] bg-white/90 px-4 py-3 text-sm font-medium text-slate-700 shadow-[0_6px_18px_rgba(15,45,93,0.04)]">
             <input
               type="checkbox"
               checked={formData.Activo}
               onChange={(e) => setFormData({ ...formData, Activo: e.target.checked })}
             />
-            <span className="text-sm font-medium">Activo</span>
+            Activo
           </label>
         </div>
       </div>
 
-      <div className="flex justify-end gap-4 pt-4 border-t">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-6 py-2 border rounded-lg hover:bg-gray-50"
-        >
+      <div className="flex justify-end gap-3 border-t border-[#e6edf7] pt-5">
+        <button type="button" onClick={onClose} className={operationSecondaryButtonClass}>
           Cancelar
         </button>
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-blue-600 text-white px-6 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 disabled:opacity-50"
-        >
-          <FaSave /> {loading ? 'Guardando...' : 'Guardar'}
+        <button type="submit" disabled={loading} className={operationPrimaryButtonClass}>
+          <FaSave className="text-xs" /> {loading ? 'Guardando...' : 'Guardar'}
         </button>
       </div>
     </form>

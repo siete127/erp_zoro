@@ -12,6 +12,17 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 load_dotenv(BASE_DIR / ".env")
 
 
+def _required_env(name: str, *, min_length: int | None = None) -> str:
+    value = (os.getenv(name) or "").strip()
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    if min_length is not None and len(value) < min_length:
+        raise RuntimeError(
+            f"Environment variable {name} must be at least {min_length} characters long"
+        )
+    return value
+
+
 def _split_csv(value: str | None) -> list[str]:
     if not value:
         return []
@@ -87,7 +98,7 @@ class Settings:
             sqlserver_extra_params=_parse_key_value_pairs(
                 os.getenv("ERP_SQLSERVER_EXTRA_PARAMS")
             ),
-            jwt_secret=os.getenv("ERP_SECRET_KEY", "ERP_SECRET_KEY"),
+            jwt_secret=_required_env("ERP_SECRET_KEY", min_length=32),
             access_token_expire_hours=int(os.getenv("ERP_ACCESS_TOKEN_EXPIRE_HOURS", "8")),
             frontend_origins=_split_csv(os.getenv("ERP_FRONTEND_ORIGINS")),
             redis_host=os.getenv("REDIS_HOST", "localhost"),

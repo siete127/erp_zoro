@@ -450,3 +450,203 @@ async def upload_foto_perfil(user_id: int, file: UploadFile, updated_by: Optiona
             {"uid": user_id, "url": public_url, "upd": updated_by},
         )
     return {"msg": "Foto de perfil actualizada", "FotoPerfilUrl": public_url}
+
+
+# ── Vacaciones ───────────────────────────────────────────────────────────────
+
+def list_vacaciones(
+    current_user_id: int,
+    user_companies: list,
+    is_super_admin: bool,
+    is_admin: bool,
+    company_id_filter: Optional[int] = None,
+    user_id_filter: Optional[int] = None,
+    estatus_filter: Optional[str] = None,
+) -> list[dict[str, Any]]:
+    """Listar solicitudes de vacaciones con permisos."""
+    conditions: list[str] = []
+    params: dict[str, Any] = {}
+
+    # Filtrar por empresa si no es super admin
+    if not is_super_admin:
+        if not user_companies:
+            return []
+        in_pl = ", ".join(f":uc{i}" for i in range(len(user_companies)))
+        conditions.append(f"uc.Company_Id IN ({in_pl})")
+        for i, v in enumerate(user_companies):
+            params[f"uc{i}"] = v
+
+    # Si no es admin ni super admin, solo ver sus propias solicitudes
+    if not is_admin and not is_super_admin:
+        conditions.append("v.User_Id = :uid")
+        params["uid"] = current_user_id
+
+    # Filtros adicionales
+    if company_id_filter:
+        conditions.append("uc.Company_Id = :cid")
+        params["cid"] = company_id_filter
+
+    if user_id_filter:
+        conditions.append("v.User_Id = :uid_filter")
+        params["uid_filter"] = user_id_filter
+
+    if estatus_filter:
+        conditions.append("v.Estatus = :est")
+        params["est"] = estatus_filter
+
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+    with get_connection() as conn:
+        rows = conn.execute(
+            text(f"""
+                SELECT DISTINCT
+                    v.Vacaciones_Id, v.User_Id, u.Name, u.Lastname, u.Email,
+                    v.FechaInicio, v.FechaFin, v.Cantidad, v.Razon, v.Observaciones,
+                    v.Estatus, v.AprobadoPor, ap.Name AS NombreAprobador,
+                    v.FechaAprobacion, v.CreatedAt, v.UpdatedAt,
+                    STRING_AGG(c.NameCompany, ', ') AS Empresa
+                FROM ERP_HR_VACATION_REQUEST v
+                LEFT JOIN ERP_USERS u ON v.User_Id = u.User_Id
+                LEFT JOIN ERP_USERS ap ON v.AprobadoPor = ap.User_Id
+                LEFT JOIN ERP_USERCOMPANIES uc ON u.User_Id = uc.User_Id
+                LEFT JOIN ERP_COMPANY c ON uc.Company_Id = c.Company_Id
+                {where}
+                GROUP BY
+                    v.Vacaciones_Id, v.User_Id, u.Name, u.Lastname, u.Email,
+                    v.FechaInicio, v.FechaFin, v.Cantidad, v.Razon, v.Observaciones,
+                    v.Estatus, v.AprobadoPor, ap.Name,
+                    v.FechaAprobacion, v.CreatedAt, v.UpdatedAt
+                ORDER BY v.CreatedAt DESC
+            """),
+            params,
+        ).mappings().all()
+    return [dict(r) for r in rows]
+
+
+def get_vacaciones(vacaciones_id: int) -> dict[str, Any]:
+    """Obtener detalles de una solicitud de vacaciones."""
+    with get_connection() as conn:
+        row = conn.execute(
+            text("""
+                SELECT v.*, u.Name, u.Lastname, u.Email, ap.Name AS NombreAprobador
+                FROM ERP_HR_VACATION_REQUEST v
+                LEFT JOIN ERP_USERS u ON v.User_Id = u.User_Id
+                LEFT JOIN ERP_USERS ap ON v.AprobadoPor = ap.User_Id
+                WHERE v.Vacaciones_Id = :vid
+            """),
+            {"vid": vacaciones_id},
+        ).mappings().first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Solicitud de vacaciones no encontrada")
+    return dict(row)
+
+
+def create_vacaciones(user_id: int, data: dict, created_by: Optional[int] = None) -> dict:
+    """Crear nueva solicitud de vacaciones."""
+    if not data.get("FechaInicio") or not data.get("FechaFin") or not data.get("Cantidad"):
+        raise HTTPException(
+            status_code=400,
+            detail="FechaInicio, FechaFin y Cantidad son requeridos"
+        )
+
+    with get_transaction() as conn:
+        row = conn.execute(
+            text("""
+                INSERT INTO ERP_HR_VACATION_REQUEST
+                  (User_Id, FechaInicio, FechaFin, Cantidad, Razon, Observaciones,
+                   Estatus, IsActive, CreatedAt, UpdatedAt, CreatedBy)
+                OUTPUT INSERTED.*
+                VALUES (:uid, :fi, :ff, :cant, :raz, :obs, 'Pendiente', 1, GETDATE(), GETDATE(), :crby)
+            """),
+            {
+                "uid": user_id,
+                "fi": data["FechaInicio"],
+                "ff": data["FechaFin"],
+                "cant": data["Cantidad"],
+                "raz": data.get("Razon"),
+                "obs": data.get("Observaciones"),
+                "crby": created_by,
+            },
+        ).mappings().first()
+    return dict(row) if row else {}
+
+
+def update_vacaciones(vacaciones_id: int, data: dict, updated_by: Optional[int] = None) -> dict:
+    """Actualizar solicitud de vacaciones (solo si está pendiente)."""
+    with get_connection() as conn:
+        existe = conn.execute(
+            text("SELECT Estatus FROM ERP_HR_VACATION_REQUEST WHERE Vacaciones_Id = :vid"),
+            {"vid": vacaciones_id},
+        ).fetchone()
+    if not existe:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    if existe[0] != "Pendiente":
+        raise HTTPException(status_code=400, detail="Solo se pueden actualizar solicitudes pendientes")
+
+    with get_transaction() as conn:
+        conn.execute(
+            text("""
+                UPDATE ERP_HR_VACATION_REQUEST SET
+                  FechaInicio=COALESCE(:fi, FechaInicio),
+                  FechaFin=COALESCE(:ff, FechaFin),
+                  Cantidad=COALESCE(:cant, Cantidad),
+                  Razon=:raz, Observaciones=:obs,
+                  UpdatedAt=GETDATE(), UpdatedBy=:upd
+                WHERE Vacaciones_Id=:vid
+            """),
+            {
+                "vid": vacaciones_id,
+                "fi": data.get("FechaInicio"),
+                "ff": data.get("FechaFin"),
+                "cant": data.get("Cantidad"),
+                "raz": data.get("Razon"),
+                "obs": data.get("Observaciones"),
+                "upd": updated_by,
+            },
+        )
+    return {"msg": "Solicitud de vacaciones actualizada"}
+
+
+def aprobar_vacaciones(vacaciones_id: int, data: dict, aprobado_por: int) -> dict:
+    """Aprobar o rechazar solicitud de vacaciones."""
+    estatus = data.get("Estatus")
+    if estatus not in ["Aprobado", "Rechazado"]:
+        raise HTTPException(status_code=400, detail="Estatus debe ser 'Aprobado' o 'Rechazado'")
+
+    with get_transaction() as conn:
+        conn.execute(
+            text("""
+                UPDATE ERP_HR_VACATION_REQUEST SET
+                  Estatus=:est,
+                  AprobadoPor=:apby,
+                  FechaAprobacion=GETDATE(),
+                  Observaciones=COALESCE(:obs, Observaciones),
+                  UpdatedAt=GETDATE()
+                WHERE Vacaciones_Id=:vid
+            """),
+            {
+                "vid": vacaciones_id,
+                "est": estatus,
+                "apby": aprobado_por,
+                "obs": data.get("Observaciones"),
+            },
+        )
+    return {"msg": f"Solicitud de vacaciones {estatus.lower()}"}
+
+
+def delete_vacaciones(vacaciones_id: int) -> dict:
+    """Eliminar solicitud de vacaciones (soft delete)."""
+    with get_connection() as conn:
+        existe = conn.execute(
+            text("SELECT Vacaciones_Id FROM ERP_HR_VACATION_REQUEST WHERE Vacaciones_Id = :vid"),
+            {"vid": vacaciones_id},
+        ).fetchone()
+    if not existe:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+    with get_transaction() as conn:
+        conn.execute(
+            text("UPDATE ERP_HR_VACATION_REQUEST SET IsActive=0, UpdatedAt=GETDATE() WHERE Vacaciones_Id=:vid"),
+            {"vid": vacaciones_id},
+        )
+    return {"msg": "Solicitud de vacaciones eliminada"}

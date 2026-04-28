@@ -6,6 +6,20 @@ const path = require("path");
 const { Server } = require("socket.io");
 require("dotenv").config();
 
+// ============================================
+// VALIDACIÓN DE VARIABLES DE ENTORNO
+// ============================================
+const { validateEnvironment, getJwtSecret } = require("./config/env");
+try {
+  validateEnvironment();
+  // Valida también la clave JWT
+  getJwtSecret();
+  console.log("✅ Variables de entorno validadas correctamente\n");
+} catch (error) {
+  console.error("\n" + error.message);
+  process.exit(1);
+}
+
 const app = express();
 const server = http.createServer(app);
 
@@ -88,8 +102,27 @@ app.get("/", (req, res) => {
   res.send("ERP Backend funcionando");
 });
 
+// ============================================
+// ENDPOINT DE SALUD PARA VERIFICAR QUE BACKEND ESTÁ CORRIENDO
+// ============================================
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    port: process.env.PORT || 5000,
+  });
+});
+
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-  console.log(`API ERP corriendo en puerto ${PORT}`);
+  console.log("\n" + "=".repeat(60));
+  console.log("✅ ERP Backend iniciado correctamente");
+  console.log("=".repeat(60));
+  console.log(`📡 API escuchando en:     http://localhost:${PORT}`);
+  console.log(`🌐 Frontend conecta en:   http://localhost:5173`);
+  console.log(`💊 Health check:          http://localhost:${PORT}/health`);
+  console.log(`📚 WebSocket (Socket.io): ws://localhost:${PORT}`);
+  console.log("=".repeat(60) + "\n");
 });
