@@ -1,8 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FaArrowLeft, FaEdit, FaCopy, FaCheckCircle, FaTimesCircle, FaTrash } from 'react-icons/fa';
+import { FaArrowLeft, FaCheckCircle, FaCopy, FaEdit, FaTimesCircle, FaTrash } from 'react-icons/fa';
+import {
+  OperationEmptyState,
+  OperationHeader,
+  OperationSectionTitle,
+  OperationStat,
+  operationContainerClass,
+  operationDangerButtonClass,
+  operationPageClass,
+  operationSecondaryButtonClass,
+  operationTableShellClass,
+} from '../../components/operation/OperationUI';
 import * as bomService from '../../services/bomService';
 import { notify } from '../../services/notify';
+
+const currency = (value, digits = 2) => `$${Number(value || 0).toFixed(digits)}`;
 
 const DetalleBOM = () => {
   const navigate = useNavigate();
@@ -20,7 +33,7 @@ const DetalleBOM = () => {
       setLoading(true);
       const [detalleRes, variacionRes] = await Promise.all([
         bomService.getBOMDetalle(id),
-        bomService.getVariacionCostosBOM(id).catch(() => ({ data: null }))
+        bomService.getVariacionCostosBOM(id).catch(() => ({ data: null })),
       ]);
       setData(detalleRes.data);
       setVariacionCostos(variacionRes?.data || null);
@@ -33,11 +46,11 @@ const DetalleBOM = () => {
   };
 
   const handleClonar = async () => {
-    const nuevaVersion = prompt('Ingrese el número de la nueva versión:');
+    const nuevaVersion = window.prompt('Ingrese el número de la nueva versión:');
     if (!nuevaVersion) return;
-    
+
     try {
-      const response = await bomService.clonarBOM(id, parseInt(nuevaVersion));
+      const response = await bomService.clonarBOM(id, Number.parseInt(nuevaVersion, 10));
       notify('BOM clonado correctamente', 'success');
       navigate(`/produccion/bom/${response.data.BOM_Id}`);
     } catch (error) {
@@ -60,258 +73,262 @@ const DetalleBOM = () => {
   };
 
   if (loading) {
-    return <div className="p-6 text-center">Cargando...</div>;
+    return (
+      <div className={operationPageClass}>
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="h-8 w-8 rounded-full border-4 border-[#1b3d86]/20 border-t-[#1b3d86] animate-spin" />
+        </div>
+      </div>
+    );
   }
 
   if (!data) {
-    return <div className="p-6 text-center">BOM no encontrado</div>;
+    return (
+      <div className={operationPageClass}>
+        <div className={`${operationContainerClass} flex min-h-screen items-center justify-center`}>
+          <OperationEmptyState title="BOM no encontrado" description="No fue posible recuperar el detalle de esta receta." />
+        </div>
+      </div>
+    );
   }
 
   const { bom, materiales, operaciones } = data;
+  const costoActual = Number(variacionCostos?.resumen?.costoTotalActual || 0);
+  const costoPrevio = Number(variacionCostos?.resumen?.costoTotalPrevio || 0);
+  const variacionAbs = Number(variacionCostos?.resumen?.variacionAbs || 0);
+  const variacionPct = variacionCostos?.resumen?.variacionPct;
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-7xl">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/produccion/bom')}
-            className="text-gray-600 hover:text-gray-800"
-          >
-            <FaArrowLeft size={24} />
-          </button>
-          <div>
-            <h1 className="text-3xl font-bold">{bom.CodigoBOM}</h1>
-            <p className="text-gray-600">Versión {bom.Version}</p>
-          </div>
-        </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => navigate(`/produccion/bom/${id}/editar`)}
-            className="flex-1 sm:flex-none bg-yellow-600 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-yellow-700"
-          >
-            <FaEdit /> Editar
-          </button>
-          <button
-            onClick={handleClonar}
-            className="flex-1 sm:flex-none bg-green-600 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-green-700"
-          >
-            <FaCopy /> Clonar
-          </button>
-        </div>
-      </div>
+    <div className={operationPageClass}>
+      <div className={operationContainerClass}>
+        <OperationHeader
+          eyebrow="Producción"
+          title={bom.CodigoBOM}
+          description={`Versión ${bom.Version} · ${bom.ProductoNombre} · ${bom.Vigente ? 'vigente' : 'obsoleta'}`}
+          actions={
+            <>
+              <button onClick={() => navigate('/produccion/bom')} className={operationSecondaryButtonClass}>
+                <FaArrowLeft className="text-xs" /> Volver
+              </button>
+              <button onClick={() => navigate(`/produccion/bom/${id}/editar`)} className={operationSecondaryButtonClass}>
+                <FaEdit className="text-xs" /> Editar
+              </button>
+              <button
+                onClick={handleClonar}
+                className="inline-flex items-center justify-center rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+              >
+                <FaCopy className="text-xs" /> Clonar
+              </button>
+            </>
+          }
+          stats={[
+            <OperationStat key="producto" label="Producto" value={bom.SKU || '-'} tone="blue" />,
+            <OperationStat key="materiales" label="Materiales" value={materiales.length} tone="amber" />,
+            <OperationStat key="operaciones" label="Operaciones" value={operaciones.length} tone="slate" />,
+            <OperationStat key="merma" label="Merma esperada" value={`${bom.MermaPct || 0}%`} tone="emerald" />,
+          ]}
+        />
 
-      {/* Información General */}
-      <div className="bg-white p-6 rounded-lg shadow mb-6">
-        <h2 className="text-xl font-semibold mb-4">Información General</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm text-gray-600">Producto</label>
-            <p className="font-medium">{bom.ProductoNombre}</p>
-            <p className="text-sm text-gray-500">{bom.SKU}</p>
+        <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+          <div className="rounded-[28px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(246,249,253,0.97))] p-5 shadow-[0_18px_40px_rgba(15,45,93,0.08)]">
+            <OperationSectionTitle
+              eyebrow="Perfil"
+              title="Información general"
+              description="Producto objetivo, vigencia, control de mermas y metadatos base de la receta."
+            />
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6b7a96]">Producto</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{bom.ProductoNombre}</p>
+                <p className="text-xs text-slate-400">{bom.SKU}</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6b7a96]">Estado</p>
+                <div className="mt-1">
+                  {bom.Vigente ? (
+                    <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                      <FaCheckCircle className="text-[10px]" /> Vigente
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                      <FaTimesCircle className="text-[10px]" /> Obsoleto
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6b7a96]">Merma esperada</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{bom.MermaPct}%</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6b7a96]">Fecha creación</p>
+                <p className="mt-1 text-sm text-slate-700">
+                  {bom.FechaCreacion ? new Date(bom.FechaCreacion).toLocaleDateString('es-MX') : '-'}
+                </p>
+              </div>
+              {bom.Descripcion ? (
+                <div className="md:col-span-2">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6b7a96]">Descripción</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">{bom.Descripcion}</p>
+                </div>
+              ) : null}
+            </div>
           </div>
-          <div>
-            <label className="text-sm text-gray-600">Estado</label>
-            <p className="flex items-center gap-2">
-              {bom.Vigente ? (
-                <span className="flex items-center gap-1 text-green-600">
-                  <FaCheckCircle /> Vigente
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-gray-400">
-                  <FaTimesCircle /> Obsoleto
-                </span>
-              )}
-            </p>
+
+          {variacionCostos?.variaciones ? (
+            <div className="rounded-[28px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(246,249,253,0.97))] p-5 shadow-[0_18px_40px_rgba(15,45,93,0.08)]">
+              <OperationSectionTitle
+                eyebrow="Costo"
+                title="Variación contra versión previa"
+                description={
+                  variacionCostos?.bomPrevio
+                    ? `Comparado contra la versión ${variacionCostos.bomPrevio.Version}`
+                    : 'Sin versión previa para comparación'
+                }
+              />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6b7a96]">Costo actual</p>
+                  <p className="mt-2 text-xl font-semibold text-slate-900">{currency(costoActual)}</p>
+                </div>
+                <div className="rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6b7a96]">Costo previo</p>
+                  <p className="mt-2 text-xl font-semibold text-slate-900">{currency(costoPrevio)}</p>
+                </div>
+                <div className="rounded-[18px] border border-violet-200 bg-violet-50 px-4 py-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6b7a96]">Variación absoluta</p>
+                  <p className={`mt-2 text-xl font-semibold ${variacionAbs >= 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                    {currency(variacionAbs)}
+                  </p>
+                </div>
+                <div className="rounded-[18px] border border-sky-200 bg-sky-50 px-4 py-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6b7a96]">Variación %</p>
+                  <p className={`mt-2 text-xl font-semibold ${Number(variacionPct || 0) >= 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                    {variacionPct == null ? 'N/A' : `${Number(variacionPct).toFixed(2)}%`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className={operationTableShellClass}>
+          <div className="border-b border-[#e7edf6] px-6 py-4">
+            <OperationSectionTitle eyebrow="BOM" title={`Materiales (${materiales.length})`} description="Composición teórica por materia prima, unidad, tipo de componente y merma." />
           </div>
-          <div>
-            <label className="text-sm text-gray-600">Merma Esperada</label>
-            <p className="font-medium">{bom.MermaPct}%</p>
-          </div>
-          <div>
-            <label className="text-sm text-gray-600">Fecha Creación</label>
-            <p className="font-medium">
-              {bom.FechaCreacion ? new Date(bom.FechaCreacion).toLocaleDateString() : '-'}
-            </p>
-          </div>
-          {bom.Descripcion && (
-            <div className="md:col-span-2">
-              <label className="text-sm text-gray-600">Descripción</label>
-              <p className="font-medium">{bom.Descripcion}</p>
+          {materiales.length === 0 ? (
+            <div className="p-6">
+              <OperationEmptyState title="Sin materiales registrados" description="Agrega componentes en la receta para construir el consumo teórico del producto." />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-[#e7edf6]">
+                    {['Código', 'Materia prima', 'Cantidad', 'Unidad', 'Tipo', 'Merma %'].map((header) => (
+                      <th key={header} className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#6b7a96] first:pl-6 last:pr-6">{header}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {materiales.map((mat, index) => (
+                    <tr key={`${mat.MateriaPrima_Id}-${index}`} className="border-t border-[#eef2f8] transition hover:bg-[#f7faff]">
+                      <td className="px-4 py-4 pl-6 text-sm text-slate-600">{mat.MateriaCodigo}</td>
+                      <td className="px-4 py-4 text-sm font-semibold text-slate-900">{mat.MateriaNombre}</td>
+                      <td className="px-4 py-4 text-sm text-slate-600">{mat.CantidadTeorica}</td>
+                      <td className="px-4 py-4 text-sm text-slate-600">{mat.UnidadMedida || '-'}</td>
+                      <td className="px-4 py-4 text-sm">
+                        <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                          mat.TipoComponente === 'Principal' ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-slate-200 bg-slate-50 text-slate-600'
+                        }`}>
+                          {mat.TipoComponente}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 pr-6 text-sm text-slate-600">{mat.MermaPct}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Materiales */}
-      <div className="bg-white p-6 rounded-lg shadow mb-6">
-        <h2 className="text-xl font-semibold mb-4">
-          Materiales ({materiales.length})
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Materia Prima</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cantidad</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unidad</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Merma %</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {materiales.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="px-4 py-4 text-center text-gray-500">
-                    No hay materiales registrados
-                  </td>
-                </tr>
-              ) : (
-                materiales.map((mat, index) => (
-                  <tr key={index}>
-                    <td className="px-4 py-3 text-sm">{mat.MateriaCodigo}</td>
-                    <td className="px-4 py-3 text-sm font-medium">{mat.MateriaNombre}</td>
-                    <td className="px-4 py-3 text-sm">{mat.CantidadTeorica}</td>
-                    <td className="px-4 py-3 text-sm">{mat.UnidadMedida || '-'}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        mat.TipoComponente === 'Principal' 
-                          ? 'bg-blue-100 text-blue-800' 
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {mat.TipoComponente}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm">{mat.MermaPct}%</td>
+        {variacionCostos?.variaciones ? (
+          <div className={operationTableShellClass}>
+            <div className="border-b border-[#e7edf6] px-6 py-4">
+              <OperationSectionTitle eyebrow="Comparativo" title="Variación por materia prima" description="Impacto de costo actual contra la versión inmediata anterior de la receta." />
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-[#e7edf6]">
+                    {['Materia', 'Costo unitario', 'Costo actual', 'Costo previo', 'Variación'].map((header) => (
+                      <th key={header} className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#6b7a96] first:pl-6 last:pr-6">{header}</th>
+                    ))}
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Variación de costos por materia prima */}
-      {variacionCostos?.variaciones && (
-        <div className="bg-white p-6 rounded-lg shadow mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Variación de Costos por Materia Prima</h2>
-            <div className="text-sm text-gray-600">
-              {variacionCostos?.bomPrevio
-                ? `Comparado contra versión ${variacionCostos.bomPrevio.Version}`
-                : 'Sin versión previa para comparación'}
+                </thead>
+                <tbody>
+                  {variacionCostos.variaciones.map((row) => (
+                    <tr key={row.MateriaPrima_Id} className="border-t border-[#eef2f8] transition hover:bg-[#f7faff]">
+                      <td className="px-4 py-4 pl-6">
+                        <div className="text-sm font-semibold text-slate-900">{row.MateriaNombre || `MP #${row.MateriaPrima_Id}`}</div>
+                        <div className="text-xs text-slate-400">{row.MateriaCodigo || '-'}</div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-slate-600">{currency(row.CostoUnitarioActual, 4)}</td>
+                      <td className="px-4 py-4 text-sm text-slate-600">{currency(row.CostoActual)}</td>
+                      <td className="px-4 py-4 text-sm text-slate-600">{currency(row.CostoPrevio)}</td>
+                      <td className={`px-4 py-4 pr-6 text-sm font-semibold ${Number(row.VariacionAbs || 0) >= 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                        {currency(row.VariacionAbs)}
+                        <span className="ml-2 text-xs font-medium">
+                          ({row.VariacionPct == null ? 'N/A' : `${Number(row.VariacionPct).toFixed(2)}%`})
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
+        ) : null}
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-            <div className="bg-gray-50 p-3 rounded border">
-              <p className="text-xs text-gray-600">Costo total actual</p>
-              <p className="font-semibold">${Number(variacionCostos.resumen?.costoTotalActual || 0).toFixed(2)}</p>
-            </div>
-            <div className="bg-gray-50 p-3 rounded border">
-              <p className="text-xs text-gray-600">Costo total previo</p>
-              <p className="font-semibold">${Number(variacionCostos.resumen?.costoTotalPrevio || 0).toFixed(2)}</p>
-            </div>
-            <div className="bg-gray-50 p-3 rounded border">
-              <p className="text-xs text-gray-600">Variación absoluta</p>
-              <p className={`font-semibold ${Number(variacionCostos.resumen?.variacionAbs || 0) >= 0 ? 'text-red-700' : 'text-green-700'}`}>
-                ${Number(variacionCostos.resumen?.variacionAbs || 0).toFixed(2)}
-              </p>
-            </div>
-            <div className="bg-gray-50 p-3 rounded border">
-              <p className="text-xs text-gray-600">Variación %</p>
-              <p className={`font-semibold ${Number(variacionCostos.resumen?.variacionPct || 0) >= 0 ? 'text-red-700' : 'text-green-700'}`}>
-                {variacionCostos.resumen?.variacionPct == null
-                  ? 'N/A'
-                  : `${Number(variacionCostos.resumen.variacionPct).toFixed(2)}%`}
-              </p>
-            </div>
+        <div className={operationTableShellClass}>
+          <div className="border-b border-[#e7edf6] px-6 py-4">
+            <OperationSectionTitle eyebrow="Proceso" title={`Operaciones y costos (${operaciones.length})`} description="Secuencia operativa, tiempo por unidad y referencia económica de cada etapa." />
           </div>
-
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Materia</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Costo Unitario</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Costo Actual</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Costo Previo</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Variación</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {variacionCostos.variaciones.map((row) => (
-                  <tr key={row.MateriaPrima_Id}>
-                    <td className="px-4 py-3 text-sm">
-                      <div className="font-medium">{row.MateriaNombre || `MP #${row.MateriaPrima_Id}`}</div>
-                      <div className="text-gray-500 text-xs">{row.MateriaCodigo || '-'}</div>
-                    </td>
-                    <td className="px-4 py-3 text-sm">${Number(row.CostoUnitarioActual || 0).toFixed(4)}</td>
-                    <td className="px-4 py-3 text-sm">${Number(row.CostoActual || 0).toFixed(2)}</td>
-                    <td className="px-4 py-3 text-sm">${Number(row.CostoPrevio || 0).toFixed(2)}</td>
-                    <td className={`px-4 py-3 text-sm font-medium ${Number(row.VariacionAbs || 0) >= 0 ? 'text-red-700' : 'text-green-700'}`}>
-                      ${Number(row.VariacionAbs || 0).toFixed(2)}
-                      <span className="ml-2 text-xs">
-                        ({row.VariacionPct == null ? 'N/A' : `${Number(row.VariacionPct).toFixed(2)}%`})
-                      </span>
-                    </td>
+          {operaciones.length === 0 ? (
+            <div className="p-6">
+              <OperationEmptyState title="Sin operaciones registradas" description="Agrega operaciones para estimar tiempos y costos del proceso productivo." />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-[#e7edf6]">
+                    {['Secuencia', 'Operación', 'Tipo costo', 'Min/Unidad', 'Costo/Unidad', 'Costo Hora', 'Acciones'].map((header) => (
+                      <th key={header} className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#6b7a96] first:pl-6 last:pr-6">{header}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Operaciones */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-semibold mb-4">
-          Operaciones y Costos ({operaciones.length})
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Secuencia</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Operación</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo Costo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Min/Unidad</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Costo/Unidad</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Costo Hora</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {operaciones.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="px-4 py-4 text-center text-gray-500">
-                    No hay operaciones registradas
-                  </td>
-                </tr>
-              ) : (
-                operaciones.map((op, index) => (
-                  <tr key={index}>
-                    <td className="px-4 py-3 text-sm">{index + 1}</td>
-                    <td className="px-4 py-3 text-sm font-medium">{op.Notas || '-'}</td>
-                    <td className="px-4 py-3 text-sm">{op.TipoCosto}</td>
-                    <td className="px-4 py-3 text-sm">{op.MinutosPorUnidad}</td>
-                    <td className="px-4 py-3 text-sm">${op.CostoPorUnidad?.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-sm">${op.CostoHoraReferencia?.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <button
-                        onClick={() => handleEliminarOperacion(op.BOM_Operacion_Id)}
-                        className="text-red-600 hover:text-red-800"
-                        title="Quitar operación"
-                      >
-                        <FaTrash />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {operaciones.map((op, index) => (
+                    <tr key={`${op.BOM_Operacion_Id || index}`} className="border-t border-[#eef2f8] transition hover:bg-[#f7faff]">
+                      <td className="px-4 py-4 pl-6 text-sm text-slate-600">{index + 1}</td>
+                      <td className="px-4 py-4 text-sm font-semibold text-slate-900">{op.Notas || '-'}</td>
+                      <td className="px-4 py-4 text-sm text-slate-600">{op.TipoCosto}</td>
+                      <td className="px-4 py-4 text-sm text-slate-600">{op.MinutosPorUnidad}</td>
+                      <td className="px-4 py-4 text-sm text-slate-600">{currency(op.CostoPorUnidad)}</td>
+                      <td className="px-4 py-4 text-sm text-slate-600">{currency(op.CostoHoraReferencia)}</td>
+                      <td className="px-4 py-4 pr-6">
+                        <button onClick={() => handleEliminarOperacion(op.BOM_Operacion_Id)} className={operationDangerButtonClass} title="Quitar operación">
+                          <FaTrash className="text-xs" /> Quitar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>
