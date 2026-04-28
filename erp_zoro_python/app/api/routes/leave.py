@@ -12,8 +12,7 @@ from app.schemas.leave import (
     LeaveBalanceResponse, LeaveBalanceSummary,
     PublicHolidayCreate, PublicHolidayResponse
 )
-from app.services import leave_service
-
+import app.services.leave_service as leave_service
 router = APIRouter(prefix="/leave", tags=["HR - Leave Management"])
 
 
