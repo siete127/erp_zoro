@@ -24,6 +24,7 @@ router.post('/ordenes/:id/cancelar',            auth, ctrl.cancelarOrden);
 router.get('/ordenes/:id/pdf',                  auth, ctrl.generarPDF);
 
 // Registro directo con factura
+router.post('/registro-directo/analizar-hoja', auth, ctrl.analizarHojaProveedorRegistroDirecto);
 router.post('/registro-directo',    auth, ctrl.registroDirecto);
 
 module.exports = router;

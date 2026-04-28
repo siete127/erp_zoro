@@ -54,7 +54,7 @@ const FormularioBOMModal = ({ id, onClose }) => {
 
   const cargarEmpresas = async () => {
     try {
-      const response = await api.get('/companies');
+      const response = await api.get('/companies/');
       const empresasData = response.data.data || response.data || [];
       const ptcCompany = findPTCRemaCompany(empresasData);
 

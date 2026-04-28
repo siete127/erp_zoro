@@ -1,6 +1,30 @@
 import React, { useEffect, useState } from 'react';
+import { FaExchangeAlt } from 'react-icons/fa';
 import api from '../../services/api';
 import { notify } from '../../services/notify';
+
+const premiumFieldClass =
+  'w-full rounded-[14px] border border-[#dce4f0] bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 shadow-[0_2px_8px_rgba(15,45,93,0.06)] outline-none transition focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20';
+
+const premiumSectionClass =
+  'rounded-[24px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(245,248,255,0.9)_100%)] p-5 shadow-[0_4px_20px_rgba(15,45,93,0.07)]';
+
+const smallFieldClass =
+  'w-full rounded-[10px] border border-[#dce4f0] bg-white px-2.5 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20';
+
+const Field = ({ label, children }) => (
+  <div className="flex flex-col gap-1.5">
+    <label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</label>
+    {children}
+  </div>
+);
+
+const InfoRow = ({ label, value }) => (
+  <div>
+    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#6b7a96]">{label}</p>
+    <p className="mt-0.5 text-sm text-slate-800">{value || '—'}</p>
+  </div>
+);
 
 export default function Transferencias() {
   const [almacenes, setAlmacenes] = useState([]);
@@ -22,10 +46,9 @@ export default function Transferencias() {
           api.get('/productos?limit=1000&page=1'),
         ]);
         setAlmacenes(aRes.data || []);
-         const arr = pRes.data?.data || pRes.data || [];
+        const arr = pRes.data?.data || pRes.data || [];
         setProductos(arr);
       } catch (err) {
-        console.error('Error cargando datos para transferencias', err);
         notify(err.response?.data?.msg || 'Error cargando datos para transferencias', 'error');
       }
     };
@@ -34,17 +57,15 @@ export default function Transferencias() {
 
   const updateDetalle = async (idx, patch) => {
     setDetalles((prev) => prev.map((d, i) => (i === idx ? { ...d, ...patch } : d)));
-    
-    // Si se selecciona un producto, obtener stock disponible
     if (patch.Producto_Id && form.Almacen_Origen_Id) {
       try {
         const res = await api.get(`/inventario?productoId=${patch.Producto_Id}&almacenId=${form.Almacen_Origen_Id}`);
         const stock = res.data[0]?.Cantidad || 0;
         setDetalles((prev) => prev.map((d, i) => (i === idx ? { ...d, stockDisponible: stock } : d)));
-      } catch (err) {
-        console.error('Error obteniendo stock', err);
+      } catch {
+        // stock stays 0
       }
-    }  
+    }
   };
 
   const addDetalle = () => {
@@ -72,12 +93,10 @@ export default function Transferencias() {
           Cantidad: Number(d.Cantidad),
         })),
     };
-
     if (!payload.Detalles.length) {
       notify('Agrega al menos un producto a transferir', 'error');
       return;
     }
-
     setLoading(true);
     try {
       await api.post('/inventario/transferencias', payload);
@@ -85,7 +104,6 @@ export default function Transferencias() {
       setForm({ Almacen_Origen_Id: '', Almacen_Destino_Id: '', Referencia: '' });
       setDetalles([{ Producto_Id: '', Cantidad: '', stockDisponible: 0 }]);
     } catch (err) {
-      console.error('Error realizando transferencia', err);
       notify(err.response?.data?.msg || 'Error realizando transferencia', 'error');
     } finally {
       setLoading(false);
@@ -97,211 +115,202 @@ export default function Transferencias() {
       const res = await api.get(`/productos/${productoId}`);
       setViewDetail(res.data);
     } catch (err) {
-      console.error('Error cargando producto', err);
       notify(err.response?.data?.msg || 'Error cargando producto', 'error');
     }
   };
 
   return (
-    <div className="w-full h-screen bg-white rounded-none shadow-none p-6 overflow-auto">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Transferencias entre almacenes</h2>
-          <p className="text-sm text-gray-600">Movimiento de stock de un almacén a otro</p>
+    <div
+      className="min-h-screen w-full px-4 sm:px-6 py-6"
+      style={{
+        background:
+          'radial-gradient(ellipse at 70% 0%, rgba(59,107,212,0.07) 0%, rgba(255,255,255,0) 60%), radial-gradient(ellipse at 0% 80%, rgba(99,102,241,0.05) 0%, rgba(255,255,255,0) 55%), #f4f6fb',
+      }}
+    >
+      <div className="mx-auto max-w-5xl space-y-5">
+
+        {/* ── Header ── */}
+        <div className="flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-gradient-to-br from-[#1b3d86] to-[#2a5fc4] shadow-[0_4px_14px_rgba(27,61,134,0.35)]">
+            <FaExchangeAlt className="text-white text-lg" />
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#3b6fd4]">Inventario</p>
+            <h1 className="text-2xl font-bold leading-tight text-[#0d1f3c]">Transferencias entre almacenes</h1>
+            <p className="text-sm text-slate-500">Movimiento de stock de un almacén a otro</p>
+          </div>
         </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* ── General data ── */}
+          <div className={premiumSectionClass}>
+            <h2 className="mb-4 text-sm font-bold text-[#0d1f3c]">Datos de la Transferencia</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Field label="Almacén Origen *">
+                <select
+                  value={form.Almacen_Origen_Id}
+                  onChange={(e) => setForm({ ...form, Almacen_Origen_Id: e.target.value })}
+                  className={premiumFieldClass}
+                >
+                  <option value="">Selecciona origen</option>
+                  {almacenes.map((a) => (
+                    <option key={a.Almacen_Id} value={a.Almacen_Id}>
+                      {a.Nombre} ({a.Codigo})
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Almacén Destino *">
+                <select
+                  value={form.Almacen_Destino_Id}
+                  onChange={(e) => setForm({ ...form, Almacen_Destino_Id: e.target.value })}
+                  className={premiumFieldClass}
+                >
+                  <option value="">Selecciona destino</option>
+                  {almacenes.map((a) => (
+                    <option key={a.Almacen_Id} value={a.Almacen_Id}>
+                      {a.Nombre} ({a.Codigo})
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Referencia">
+                <input
+                  type="text"
+                  value={form.Referencia}
+                  onChange={(e) => setForm({ ...form, Referencia: e.target.value })}
+                  placeholder="Ej: Ajuste mensual"
+                  className={premiumFieldClass}
+                />
+              </Field>
+            </div>
+          </div>
+
+          {/* ── Products to transfer ── */}
+          <div className={premiumSectionClass}>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-[#0d1f3c]">Productos a transferir</h2>
+              <button
+                type="button"
+                onClick={addDetalle}
+                className="rounded-[10px] border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+              >
+                + Agregar producto
+              </button>
+            </div>
+
+            {/* Table header */}
+            <div className="mb-2 grid grid-cols-12 gap-2 px-1">
+              <p className="col-span-6 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Producto</p>
+              <p className="col-span-3 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Cantidad</p>
+              <p className="col-span-3 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Acciones</p>
+            </div>
+
+            <div className="space-y-2">
+              {detalles.map((d, idx) => (
+                <div key={idx} className="grid grid-cols-12 items-start gap-2 rounded-[14px] border border-[#eaf0fa] bg-white px-3 py-3">
+                  <div className="col-span-6">
+                    <select
+                      value={d.Producto_Id}
+                      onChange={(e) => updateDetalle(idx, { Producto_Id: e.target.value })}
+                      className={smallFieldClass}
+                    >
+                      <option value="">Selecciona producto</option>
+                      {productos.map((p) => (
+                        <option key={p.Producto_Id} value={p.Producto_Id}>
+                          {p.SKU} — {p.Nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-3">
+                    <input
+                      type="number"
+                      min="0"
+                      max={d.stockDisponible || undefined}
+                      step="0.01"
+                      value={d.Cantidad}
+                      onChange={(e) => updateDetalle(idx, { Cantidad: e.target.value })}
+                      placeholder="Cantidad"
+                      className={smallFieldClass}
+                    />
+                    {d.Producto_Id && d.stockDisponible > 0 && (
+                      <p className="mt-0.5 text-[11px] text-emerald-600">Disponible: {d.stockDisponible}</p>
+                    )}
+                    {d.Producto_Id && d.stockDisponible === 0 && (
+                      <p className="mt-0.5 text-[11px] text-rose-500">Sin stock</p>
+                    )}
+                  </div>
+                  <div className="col-span-3 flex gap-1.5">
+                    {d.Producto_Id && (
+                      <button
+                        type="button"
+                        onClick={() => viewProductDetail(d.Producto_Id)}
+                        className="rounded-[8px] border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                      >
+                        Ver
+                      </button>
+                    )}
+                    {detalles.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeDetalle(idx)}
+                        className="rounded-[8px] border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-100"
+                      >
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 flex justify-end border-t border-[#eaf0fa] pt-4">
+              <button
+                type="submit"
+                disabled={loading}
+                className="rounded-[14px] bg-gradient-to-r from-[#1b3d86] to-[#2a5fc4] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(27,61,134,0.30)] transition hover:shadow-[0_6px_20px_rgba(27,61,134,0.40)] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Procesando…' : 'Confirmar transferencia'}
+              </button>
+            </div>
+          </div>
+        </form>
+
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4 max-w-5xl">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Almacén origen *</label>
-            <select
-              value={form.Almacen_Origen_Id}
-              onChange={(e) => setForm({ ...form, Almacen_Origen_Id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded"
-            >
-              <option value="">Selecciona origen</option>
-              {almacenes.map((a) => (
-                <option key={a.Almacen_Id} value={a.Almacen_Id}>
-                  {a.Nombre} ({a.Codigo})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Almacén destino *</label>
-            <select
-              value={form.Almacen_Destino_Id}
-              onChange={(e) => setForm({ ...form, Almacen_Destino_Id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded"
-            >
-              <option value="">Selecciona destino</option>
-              {almacenes.map((a) => (
-                <option key={a.Almacen_Id} value={a.Almacen_Id}>
-                  {a.Nombre} ({a.Codigo})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Referencia</label>
-          <input
-            type="text"
-            value={form.Referencia}
-            onChange={(e) => setForm({ ...form, Referencia: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded"
-          />
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold mb-2">Productos a transferir</h3>
-          <div className="space-y-2">
-            {detalles.map((d, idx) => (
-              <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                <div className="col-span-5">
-                  <select
-                    value={d.Producto_Id}
-                    onChange={(e) => updateDetalle(idx, { Producto_Id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
-                  >
-                    <option value="">Selecciona producto</option>
-                    {productos.map((p) => (
-                      <option key={p.Producto_Id} value={p.Producto_Id}>
-                        {p.SKU} - {p.Nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <input
-                    type="number"
-                    min="0"
-                    max={d.stockDisponible}
-                    step="0.01"
-                    value={d.Cantidad}
-                    onChange={(e) => updateDetalle(idx, { Cantidad: e.target.value })}
-                    placeholder="Cantidad"
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
-                  />
-                  {d.Producto_Id && d.stockDisponible > 0 && (
-                    <p className="text-xs text-gray-600 mt-1">Disponible: {d.stockDisponible}</p>
-                  )}
-                  {d.Producto_Id && d.stockDisponible === 0 && (
-                    <p className="text-xs text-red-600 mt-1">Sin stock</p>
-                  )}
-                </div>
-                <div className="col-span-4 flex gap-1">
-                  {d.Producto_Id && (
-                    <button
-                      type="button"
-                      onClick={() => viewProductDetail(d.Producto_Id)}
-                      className="px-3 py-2 bg-[#092052] text-white rounded text-xs hover:bg-[#0d3a7a]"
-                    >
-                      Ver
-                    </button>
-                  )}
-                  {detalles.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeDetalle(idx)}
-                      className="px-3 py-2 bg-red-600 text-white rounded text-xs hover:bg-red-700"
-                    >
-                      Quitar
-                    </button>
-                  )}
-                  {idx === detalles.length - 1 && (
-                    <button
-                      type="button"
-                      onClick={addDetalle}
-                      className="px-3 py-2 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
-                    >
-                      Agregar
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="pt-4 flex gap-2">
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
-          >
-            {loading ? 'Procesando...' : 'Confirmar transferencia'}
-          </button>
-        </div>
-      </form>
-
+      {/* ── Product detail modal ── */}
       {viewDetail && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl max-h-[95vh] bg-white rounded-2xl shadow-2xl p-6 overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900">Detalle del producto</h3>
-              <button
-                onClick={() => setViewDetail(null)}
-                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
-              >
-                ×
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="flex w-full max-w-lg flex-col overflow-hidden rounded-[26px] shadow-2xl">
+            <div className="flex items-center justify-between bg-gradient-to-r from-[#1b3d86] to-[#2a5fc4] px-6 py-4">
+              <h3 className="text-base font-bold text-white">Detalle del Producto</h3>
+              <button onClick={() => setViewDetail(null)} className="text-white/70 hover:text-white text-2xl leading-none">&times;</button>
             </div>
-            <div className="space-y-3 text-sm">
+            <div className="bg-white p-6">
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="font-semibold text-gray-600">SKU:</span>
-                  <p className="text-gray-900">{viewDetail.SKU}</p>
-                </div>
-                <div>
-                  <span className="font-semibold text-gray-600">Nombre:</span>
-                  <p className="text-gray-900">{viewDetail.Nombre}</p>
-                </div>
+                <InfoRow label="SKU" value={viewDetail.SKU} />
+                <InfoRow label="Nombre" value={viewDetail.Nombre} />
+                <InfoRow label="Precio" value={typeof viewDetail.Precio === 'number' ? `$${viewDetail.Precio.toFixed(2)}` : viewDetail.Precio} />
+                <InfoRow label="Moneda" value={viewDetail.TipoMoneda} />
+                <InfoRow label="Clave SAT" value={viewDetail.ClaveProdServSAT} />
+                <InfoRow label="Clave Unidad SAT" value={viewDetail.ClaveUnidadSAT} />
+                <InfoRow label="Objeto Impuesto" value={viewDetail.ObjetoImpuesto} />
+                <InfoRow label="Activo" value={viewDetail.Activo ? 'Sí' : 'No'} />
               </div>
-              <div>
-                <span className="font-semibold text-gray-600">Descripción:</span>
-                <p className="text-gray-900">{viewDetail.Descripcion || '-'}</p>
+              {viewDetail.Descripcion && (
+                <div className="mt-4">
+                  <InfoRow label="Descripción" value={viewDetail.Descripcion} />
+                </div>
+              )}
+              <div className="mt-5 flex justify-end">
+                <button
+                  onClick={() => setViewDetail(null)}
+                  className="rounded-[14px] bg-gradient-to-r from-[#1b3d86] to-[#2a5fc4] px-5 py-2.5 text-sm font-semibold text-white"
+                >
+                  Cerrar
+                </button>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="font-semibold text-gray-600">Precio:</span>
-                  <p className="text-gray-900">{typeof viewDetail.Precio === 'number' ? viewDetail.Precio.toFixed(2) : viewDetail.Precio}</p>
-                </div>
-                <div>
-                  <span className="font-semibold text-gray-600">Moneda:</span>
-                  <p className="text-gray-900">{viewDetail.TipoMoneda || '-'}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="font-semibold text-gray-600">Clave Producto/Servicio SAT:</span>
-                  <p className="text-gray-900">{viewDetail.ClaveProdServSAT || '-'}</p>
-                </div>
-                <div>
-                  <span className="font-semibold text-gray-600">Clave Unidad SAT:</span>
-                  <p className="text-gray-900">{viewDetail.ClaveUnidadSAT || '-'}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="font-semibold text-gray-600">Objeto de Impuesto:</span>
-                  <p className="text-gray-900">{viewDetail.ObjetoImpuesto || '-'}</p>
-                </div>
-                <div>
-                  <span className="font-semibold text-gray-600">Activo:</span>
-                  <p className="text-gray-900">{viewDetail.Activo ? 'Sí' : 'No'}</p>
-                </div>
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setViewDetail(null)}
-                className="px-4 py-2 bg-[#092052] text-white rounded hover:bg-[#0d3a7a]"
-              >
-                Cerrar
-              </button>
             </div>
           </div>
         </div>

@@ -2,6 +2,8 @@ const { pool, sql } = require("../config/db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
+const jwtSecret = process.env.ERP_SECRET_KEY || 'ERP_SECRET_KEY';
+
 exports.login = async (req, res) => {
   const { username, password } = req.body;
 
@@ -34,7 +36,7 @@ exports.login = async (req, res) => {
         rol: user.RolId,
         companies: userCompanies
       },
-      "ERP_SECRET_KEY",
+      jwtSecret,
       { expiresIn: "8h" }
     );
     // Update user's last login first (separate query for clarity/reliability)

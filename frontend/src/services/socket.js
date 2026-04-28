@@ -8,12 +8,32 @@ const forcePollingInProd =
   || hostname === 'erp.ardabytec.vip'
   || hostname === 'qaerp.ardabytec.vip';
 
+const getToken = () => {
+  try {
+    return localStorage.getItem('token') || '';
+  } catch {
+    return '';
+  }
+};
+
 export const socket = io(baseUrl, {
-  autoConnect: true,
+  autoConnect: false,
   withCredentials: true,
   transports: forcePollingInProd ? ["polling"] : ["websocket", "polling"],
   upgrade: !forcePollingInProd,
+  auth: { token: getToken() },
 });
+
+// Conecta o reconecta actualizando el token desde localStorage
+export const connectSocket = () => {
+  socket.auth = { token: getToken() };
+  if (!socket.connected) socket.connect();
+};
+
+// Si ya hay token al cargar (refresh de página estando logueado), conectar de inmediato
+if (getToken()) {
+  socket.connect();
+}
 
 socket.on("connect", () => {
   console.log("Conectado a WebSocket ERP", socket.id);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { notify } from '../services/notify';
 
 const ClientPricing = ({ clientId }) => {
@@ -21,19 +21,19 @@ const ClientPricing = ({ clientId }) => {
 
   const loadClientPrices = async () => {
     try {
-      const res = await axios.get(`/api/client-pricing/client/${clientId}/prices`);
+      const res = await api.get(`/client-pricing/client/${clientId}/prices`);
       setProducts(res.data.data);
-    } catch (error) {
-      console.error('Error al cargar precios:', error);
+    } catch {
+      console.error('Error al cargar precios');
     }
   };
 
   const loadPendingRequests = async () => {
     try {
-      const res = await axios.get('/api/client-pricing/price-change-requests/pending');
+      const res = await api.get('/client-pricing/price-change-requests/pending');
       setPendingRequests(res.data.data);
-    } catch (error) {
-      console.error('Error al cargar solicitudes:', error);
+    } catch {
+      console.error('Error al cargar solicitudes');
     }
   };
 
@@ -51,7 +51,7 @@ const ClientPricing = ({ clientId }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('/api/client-pricing/price-change-request', {
+      await api.post('/client-pricing/price-change-request', {
         clientId,
         productId: selectedProduct.Product_Id,
         newPrice: parseFloat(formData.newPrice),

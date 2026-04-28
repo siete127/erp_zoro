@@ -81,6 +81,8 @@ app.use("/api/complementos-pago", require("./routes/complementoPago.routes"));
 app.use("/api/rh", require("./routes/rh.routes"));
 app.use("/api/cp", require("./routes/cp.routes"));
 app.use("/api/compras", require("./routes/compras.routes"));
+app.use("/api/accounting", require("./routes/accounting.routes"));
+app.use("/api/superadmin", require("./routes/superadmin.routes"));
 
 app.get("/", (req, res) => {
   res.send("ERP Backend funcionando");

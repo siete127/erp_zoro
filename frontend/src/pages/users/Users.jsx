@@ -6,8 +6,9 @@ import UserCreate from './UserCreate';
 import UserPermissions from '../../components/UserPermissions';
 import { getUserCompanies, getUserRole } from '../../utils/tokenHelper';
 
+const premiumField = "w-full rounded-[12px] border border-[#dce4f0] bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.06)] outline-none focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20";
+
 export default function Users() {
-  const [tab, setTab] = useState('gestor');
   const [users, setUsers] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -17,16 +18,11 @@ export default function Users() {
   const [viewingDetails, setViewingDetails] = useState(null);
   const [showPermissions, setShowPermissions] = useState(false);
   const [selectedUserForPermissions, setSelectedUserForPermissions] = useState(null);
-  const [roleModules, setRoleModules] = useState([]);
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
-  const [createMode, setCreateMode] = useState(false);  
-  const [creating, setCreating] = useState(false);
-  const [newUser, setNewUser] = useState({
-    Name: '', Lastname: '', Username: '', Password: '', Email: '', PhoneNumber: '', Area: '', RolId: '', IsActive: true, CreatedBy: 1
-  });
+  const [createMode, setCreateMode] = useState(false);
   const [allowedCompanyIds, setAllowedCompanyIds] = useState([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
@@ -41,11 +37,10 @@ export default function Users() {
     const fetchUsers = async () => {
       setLoading(true);
       try {
-        const url = selectedCompany === 'all' ? '/users' : `/users?company_id=${selectedCompany}`;
+        const url = selectedCompany === 'all' ? '/users/' : `/users/?company_id=${selectedCompany}`;
         const res = await api.get(url);
         setUsers(res.data || []);
       } catch (err) {
-        console.error('Error fetching users', err);
         setError('Error cargando usuarios');
       } finally {
         setLoading(false);
@@ -54,53 +49,37 @@ export default function Users() {
     fetchUsers();
     (async () => {
       try {
-        const r = await api.get('/roles');
+        const r = await api.get('/roles/');
         setRoles(r.data || []);
-      } catch (e) {
-        console.warn('Could not load roles', e);
-      }
+      } catch {}
     })();
     (async () => {
       try {
-        const c = await api.get('/companies');
+        const c = await api.get('/companies/');
         const allCompanies = c.data || [];
-        if (isSuperAdmin) {
-          setCompanies(allCompanies);
-          return;
-        }
-
+        if (isSuperAdmin) { setCompanies(allCompanies); return; }
         const filtered = allCompanies.filter((company) => allowedCompanyIds.includes(Number(company.Company_Id)));
         setCompanies(filtered);
-
         if (selectedCompany !== 'all' && !filtered.some((company) => String(company.Company_Id) === String(selectedCompany))) {
           setSelectedCompany('all');
         }
-      } catch (e) {
-        console.warn('Could not load companies', e);
-      }
+      } catch {}
     })();
   }, [selectedCompany, allowedCompanyIds, isSuperAdmin]);
 
   const refresh = async () => {
     setLoading(true);
     try {
-      const url = selectedCompany === 'all' ? '/users' : `/users?company_id=${selectedCompany}`;
+      const url = selectedCompany === 'all' ? '/users/' : `/users/?company_id=${selectedCompany}`;
       const res = await api.get(url);
       setUsers(res.data || []);
-    } catch (err) {
-      console.error('Error refreshing users', err);
-    } finally {
-      setLoading(false);
-    }
+    } catch {} finally { setLoading(false); }
   };
-
-  // Permissions UI and API calls removed for now per request
 
   const startEdit = (user) => {
     const copy = { ...user };
     copy.IsActive = !!copy.IsActive;
     setEditingUser(copy);
-    setTab('gestor');
     setCreateMode(true);
   };
 
@@ -108,32 +87,8 @@ export default function Users() {
     try {
       const res = await api.get(`/users/${u.User_Id}`);
       setViewingDetails(res.data);
-    } catch (err) {
-      console.error('Error cargando detalles del usuario', err);
+    } catch {
       notify('Error cargando detalles del usuario', 'error');
-    }
-  };
-
-  const cancelEdit = () => setEditingUser(null);
-
-  const saveEdit = async () => {
-    if (!editingUser) return;
-    setSaving(true);
-    try {
-      const payload = { ...editingUser, RolId: editingUser.RolId ? Number(editingUser.RolId) : null };
-      await api.put(`/users/${editingUser.User_Id}`, payload);
-      setEditingUser(null);
-      await refresh();
-      setNotice('Usuario guardado correctamente');
-      notify('Usuario guardado correctamente', 'success');
-      setTimeout(() => setNotice(''), 3000);
-    } catch (err) {
-      console.error('Save user error', err);
-      setNotice(err.response?.data?.msg || 'Error guardando usuario');
-      notify(err.response?.data?.msg || 'Error guardando usuario', 'error');
-      setTimeout(() => setNotice(''), 4000);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -141,8 +96,7 @@ export default function Users() {
     try {
       await api.patch(`/users/${u.User_Id}/active`, { IsActive: u.IsActive ? 0 : 1 });
       await refresh();
-    } catch (err) {
-      console.error('Toggle active error', err);
+    } catch {
       notify('Error cambiando estado', 'error');
     }
   };
@@ -153,191 +107,248 @@ export default function Users() {
     try {
       await api.delete(`/users/${u.User_Id}`);
       await refresh();
-    } catch (err) {
-      console.error('Delete user error', err);
+    } catch {
       notify('Error eliminando usuario', 'error');
     }
   };
 
-  const title = 'Gestor de usuarios';
+  const getRoleName = (rolId) =>
+    (roles.find(r => (r.Rol_Id ?? r.RolId ?? r.id) === rolId)?.Name) || rolId;
+
+  const filteredUsers = users.filter(u => {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    return (`${u.Name} ${u.Lastname}`.toLowerCase().includes(q) ||
+      (u.Username || '').toLowerCase().includes(q) ||
+      (u.Email || '').toLowerCase().includes(q));
+  });
 
   return (
-    <div className="w-full h-screen bg-white rounded-none shadow-none p-6 animate-in fade-in duration-700 overflow-auto">
-      <h2 className="text-2xl font-bold mb-4 text-gray-900">{title}</h2>
+    <div
+      className="min-h-screen w-full px-4 sm:px-6 py-6 space-y-5"
+      style={{ background: 'radial-gradient(ellipse at 70% 0%, rgba(59,107,212,0.07) 0%, rgba(255,255,255,0) 60%), radial-gradient(ellipse at 0% 80%, rgba(99,102,241,0.05) 0%, rgba(255,255,255,0) 55%), #f4f6fb' }}
+    >
+      <div className="mx-auto max-w-7xl space-y-5">
 
-      <div className="mb-4">
-          <nav className="flex gap-3">
-          <button onClick={() => setTab('gestor')} className={`px-3 py-2 rounded-md ${tab === 'gestor' ? 'bg-[#092052] text-white' : 'bg-gray-200 text-gray-800'}`}>
-            Gestor de usuarios
+        {/* Header */}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#3b6fd4]">Administración</p>
+            <h1 className="text-2xl font-bold leading-tight text-[#0d1f3c]">Gestor de Usuarios</h1>
+            <p className="text-sm text-slate-500">Edita datos, activa/desactiva o gestiona permisos de usuarios.</p>
+          </div>
+          <button
+            onClick={() => { setEditingUser(null); setCreateMode(true); }}
+            className="rounded-[14px] bg-gradient-to-r from-[#1b3d86] to-[#2a5fc4] px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(27,61,134,0.30)] transition"
+          >
+            + Crear usuario
           </button>
-        </nav>
-      </div>
+        </div>
 
-      {/* 'usuarios' tab removed - management happens in 'gestor' */}
+        {notice && (
+          <div className="rounded-[14px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {notice}
+          </div>
+        )}
 
-      {tab === 'gestor' && (
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h3 className="font-semibold text-gray-900">Gestor de usuarios</h3>
-              <p className="text-sm text-gray-600">Edita los datos del usuario, activa/desactiva o elimina permanentemente.</p>
+        {/* Filters */}
+        <div className="rounded-[20px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(245,248,255,0.9)_100%)] px-5 py-4 shadow-[0_4px_20px_rgba(15,45,93,0.07)]">
+          <div className="flex flex-wrap items-end gap-3">
+            {companies.length > 1 && (
+              <div className="flex-1 min-w-[180px]">
+                <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7a96]">Empresa</label>
+                <select className={premiumField} value={selectedCompany} onChange={(e) => setSelectedCompany(e.target.value)}>
+                  {isSuperAdmin && <option value="all">Todas las empresas</option>}
+                  {companies.map(c => <option key={c.Company_Id} value={c.Company_Id}>{c.NameCompany}</option>)}
+                </select>
+              </div>
+            )}
+            {companies.length === 1 && (
+              <div>
+                <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7a96]">Empresa</label>
+                <span className="inline-flex items-center rounded-[12px] border border-[#dce4f0] bg-white px-3.5 py-2.5 text-sm text-slate-700">
+                  {companies[0].NameCompany}
+                </span>
+              </div>
+            )}
+            <div className="flex-1 min-w-[240px]">
+              <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7a96]">Buscar</label>
+              <input
+                className={premiumField}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Nombre, usuario o email..."
+              />
             </div>
-            <div>
-              <button onClick={() => setCreateMode(true)} className="px-3 py-2 bg-green-600 text-white rounded">Crear usuario</button>
+            <div className="text-sm text-slate-400 pb-2.5">
+              {filteredUsers.length} usuario{filteredUsers.length !== 1 ? 's' : ''}
             </div>
           </div>
+        </div>
 
-          {/* Moved users list here (previously under 'usuarios') */}
+        {/* Table */}
+        <div className="rounded-[28px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(245,248,255,0.9)_100%)] shadow-[0_18px_40px_rgba(15,45,93,0.10)] overflow-hidden">
           {loading ? (
-            <p className="text-gray-900">Cargando usuarios...</p>
+            <div className="flex items-center justify-center py-16">
+              <div className="h-8 w-8 rounded-full border-4 border-[#1b3d86]/20 border-t-[#1b3d86] animate-spin" />
+            </div>
           ) : error ? (
-            <p className="text-red-500">{error}</p>
+            <p className="px-6 py-12 text-center text-sm text-rose-500">{error}</p>
+          ) : filteredUsers.length === 0 ? (
+            <p className="px-6 py-12 text-center text-sm text-slate-400">No hay usuarios registrados.</p>
           ) : (
-            <div>
-              <div className="flex items-center justify-between mb-3 gap-3">
-                <div className="flex items-center gap-2">
-                  <select value={selectedCompany} onChange={(e) => setSelectedCompany(e.target.value)} className="p-2 rounded border bg-white text-gray-900 border-gray-300">
-                    <option value="all">Todas las empresas</option>
-                    {companies.map(c => <option key={c.Company_Id} value={c.Company_Id}>{c.NameCompany}</option>)}
-                  </select>
-                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por nombre, usuario o email" className="w-full max-w-md p-2 rounded border bg-white text-gray-900 border-gray-300 placeholder-gray-500" />
-                </div>
-                <div className="text-sm text-gray-600">{users.length} usuarios</div>
-              </div>
-
-              <div className="overflow-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="text-sm text-gray-600">
-                      <th className="py-2 pr-4">Nombre</th>
-                      <th className="py-2 pr-4">Usuario</th>
-                      <th className="py-2 pr-4">Email</th>
-                      <th className="py-2 pr-4">Teléfono</th>
-                      <th className="py-2 pr-4">Área</th>
-                      <th className="py-2 pr-4">Rol</th>
-                      <th className="py-2 pr-4">Estado</th>
-                      <th className="py-2 pr-4">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.filter(u => {
-                      if (!query) return true;
-                      const q = query.toLowerCase();
-                      return (`${u.Name} ${u.Lastname}`.toLowerCase().includes(q) || (u.Username||'').toLowerCase().includes(q) || (u.Email||'').toLowerCase().includes(q));
-                    }).map(u => (
-                      <tr key={u.User_Id} className="border-t border-gray-200">
-                        <td className="py-3 pr-4 text-gray-900">{u.Name} {u.Lastname}</td>
-                        <td className="py-3 pr-4 text-gray-900">{u.Username}</td>
-                        <td className="py-3 pr-4 text-gray-900">{u.Email}</td>
-                        <td className="py-3 pr-4 text-gray-900">{u.PhoneNumber}</td>
-                        <td className="py-3 pr-4 text-gray-900">{u.Area || '-'}</td>
-                        <td className="py-3 pr-4 text-gray-900">{(roles.find(r => (r.Rol_Id ?? r.RolId ?? r.id) === u.RolId)?.Name) || u.RolId}</td>
-                        <td className="py-3 pr-4">
-                          {u.IsActive ? <span className="inline-block w-3 h-3 bg-green-500 rounded-full" title="Activo"></span> : <span className="inline-block w-3 h-3 bg-red-500 rounded-full" title="Inactivo"></span>}
-                        </td>
-                        <td className="py-3 pr-4">
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => viewDetails(u)} className="px-3 py-1 text-sm bg-[#092052] hover:bg-[#0d3a7a] text-white rounded">Detalles</button>
-                            <button onClick={() => startEdit(u)} className="px-3 py-1 text-sm bg-gray-600 text-white rounded">Editar</button>
-                            <button onClick={() => { setSelectedUserForPermissions(u); setShowPermissions(true); }} className="px-3 py-1 text-sm bg-purple-600 text-white rounded">🔒 Permisos</button>
-                            <button onClick={() => toggleActive(u)} className="px-3 py-1 text-sm bg-yellow-500 text-white rounded">{u.IsActive ? 'Desactivar' : 'Activar'}</button>
-                            <button onClick={() => removeUser(u)} className="px-3 py-1 text-sm bg-red-600 text-white rounded">Eliminar</button>
-                          </div>
-                        </td>
-                      </tr>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-[#eaf0fa]">
+                    {["Nombre", "Usuario", "Email", "Área", "Rol", "Estado", "Acciones"].map(col => (
+                      <th key={col} className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#6b7a96] first:pl-6 last:pr-6">{col}</th>
                     ))}
-                  </tbody>
-                </table>
-                {users.length === 0 && <p className="mt-4 text-sm text-gray-600">No hay usuarios registrados.</p>}
-              </div>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map(u => (
+                    <tr key={u.User_Id} className="border-t border-[#eaf0fa] transition hover:bg-[#f4f7ff]/60">
+                      <td className="px-4 py-3 pl-6 text-sm font-semibold text-slate-800">{u.Name} {u.Lastname}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{u.Username}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{u.Email}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{u.Area || '—'}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{getRoleName(u.RolId)}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                          u.IsActive
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-slate-200 bg-slate-50 text-slate-500"
+                        }`}>
+                          {u.IsActive ? "Activo" : "Inactivo"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 pr-6">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            onClick={() => viewDetails(u)}
+                            className="rounded-[9px] border border-[#1b3d86]/20 bg-[#f0f4ff] px-2.5 py-1.5 text-xs font-semibold text-[#1b3d86] hover:bg-[#e4ecff] transition"
+                          >
+                            Detalles
+                          </button>
+                          <button
+                            onClick={() => startEdit(u)}
+                            className="rounded-[9px] border border-[#1b3d86]/20 bg-[#f0f4ff] px-2.5 py-1.5 text-xs font-semibold text-[#1b3d86] hover:bg-[#e4ecff] transition"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => { setSelectedUserForPermissions(u); setShowPermissions(true); }}
+                            className="rounded-[9px] border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition"
+                          >
+                            🔒 Permisos
+                          </button>
+                          <button
+                            onClick={() => toggleActive(u)}
+                            className={`rounded-[9px] border px-2.5 py-1.5 text-xs font-semibold transition ${
+                              u.IsActive
+                                ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                                : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            }`}
+                          >
+                            {u.IsActive ? 'Desactivar' : 'Activar'}
+                          </button>
+                          <button
+                            onClick={() => removeUser(u)}
+                            className="rounded-[9px] border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
+        </div>
 
-          {createMode && (
-            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-              <div className="w-full max-w-3xl max-h-[95vh]">
-                <UserCreate
-                  editMode={!!editingUser}
-                  initialData={editingUser}
-                  allowedCompanyIds={allowedCompanyIds}
-                  isSuperAdmin={isSuperAdmin}
-                  onCreated={async () => {
-                    setCreateMode(false);
-                    setNewUser({ Name: '', Lastname: '', Username: '', Password: '', Email: '', PhoneNumber: '', Area: '', RolId: '', IsActive: true, CreatedBy: 1 });
-                    setNotice('Nuevo usuario creado exitosamente'); notify('Nuevo usuario creado exitosamente', 'success'); setTimeout(() => setNotice(''), 3000); await refresh();
-                  }}
-                  onSaved={async () => {
-                    setCreateMode(false);
-                    setEditingUser(null);
-                    setNotice('Usuario actualizado correctamente'); notify('Usuario actualizado correctamente', 'success'); setTimeout(() => setNotice(''), 3000); await refresh();
-                  }}
-                  onCancel={() => { setCreateMode(false); setEditingUser(null); }}
-                />
-              </div>
-            </div>
-          )}
+      </div>
 
-          {/* Editing handled via the UserCreate modal (editMode) */}
-          {!editingUser && <p className="text-sm text-gray-600">Selecciona "Editar" en la tabla para modificar un usuario.</p>}
+      {/* Create/Edit Modal */}
+      {createMode && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl max-h-[95vh]">
+            <UserCreate
+              editMode={!!editingUser}
+              initialData={editingUser}
+              allowedCompanyIds={allowedCompanyIds}
+              isSuperAdmin={isSuperAdmin}
+              onCreated={async () => {
+                setCreateMode(false);
+                setNotice('Nuevo usuario creado exitosamente');
+                notify('Nuevo usuario creado exitosamente', 'success');
+                setTimeout(() => setNotice(''), 3000);
+                await refresh();
+              }}
+              onSaved={async () => {
+                setCreateMode(false);
+                setEditingUser(null);
+                setNotice('Usuario actualizado correctamente');
+                notify('Usuario actualizado correctamente', 'success');
+                setTimeout(() => setNotice(''), 3000);
+                await refresh();
+              }}
+              onCancel={() => { setCreateMode(false); setEditingUser(null); }}
+            />
+          </div>
         </div>
       )}
 
+      {/* Details Modal */}
       {viewingDetails && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="bg-[#092052] px-6 py-4 flex items-center justify-between sticky top-0">
-              <h2 className="text-xl font-bold text-white">Detalles del Usuario</h2>
-              <button onClick={() => setViewingDetails(null)} className="text-white hover:bg-white/20 rounded-full p-2">
-                <span className="text-2xl">×</span>
-              </button>
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto overflow-hidden rounded-[20px] shadow-[0_24px_64px_rgba(10,20,50,0.22)]">
+            <div className="bg-gradient-to-r from-[#1b3d86] to-[#2a5fc4] px-6 py-4 flex items-center justify-between sticky top-0">
+              <h2 className="text-base font-bold text-white">Detalles del Usuario</h2>
+              <button onClick={() => setViewingDetails(null)} className="text-white/70 hover:text-white text-xl leading-none">×</button>
             </div>
-            <div className="p-6 space-y-4">
-              <div className="bg-gray-100 rounded-xl p-4">
-                <h3 className="text-lg font-bold text-gray-900 mb-3">Información Personal</h3>
+            <div className="bg-white p-6 space-y-4">
+              <div className="rounded-[16px] border border-[#eaf0fa] bg-[#f8faff] p-4">
+                <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#6b7a96]">Información Personal</p>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-600 font-semibold">Nombre</p>
-                    <p className="text-sm text-gray-900">{viewingDetails.Name} {viewingDetails.Lastname}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600 font-semibold">Usuario</p>
-                    <p className="text-sm text-gray-900">{viewingDetails.Username}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600 font-semibold">Email</p>
-                    <p className="text-sm text-gray-900">{viewingDetails.Email || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600 font-semibold">Teléfono</p>
-                    <p className="text-sm text-gray-900">{viewingDetails.PhoneNumber || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600 font-semibold">Área</p>
-                    <p className="text-sm text-gray-900">{viewingDetails.Area || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600 font-semibold">Rol</p>
-                    <p className="text-sm text-gray-900">{(roles.find(r => (r.Rol_Id ?? r.RolId ?? r.id) === viewingDetails.RolId)?.Name) || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600 font-semibold">Estado</p>
-                    <p className="text-sm text-gray-900">{viewingDetails.IsActive ? 'Activo' : 'Inactivo'}</p>
-                  </div>
+                  {[
+                    ["Nombre", `${viewingDetails.Name} ${viewingDetails.Lastname}`],
+                    ["Usuario", viewingDetails.Username],
+                    ["Email", viewingDetails.Email || '—'],
+                    ["Teléfono", viewingDetails.PhoneNumber || '—'],
+                    ["Área", viewingDetails.Area || '—'],
+                    ["Rol", getRoleName(viewingDetails.RolId)],
+                    ["Estado", viewingDetails.IsActive ? 'Activo' : 'Inactivo'],
+                  ].map(([label, value]) => (
+                    <div key={label}>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7a96]">{label}</p>
+                      <p className="mt-0.5 text-sm text-slate-800">{value}</p>
+                    </div>
+                  ))}
                   {viewingDetails.companies && viewingDetails.companies.length > 0 && (
                     <div className="col-span-2">
-                      <p className="text-xs text-gray-600 font-semibold">Empresas Asignadas</p>
-                      <p className="text-sm text-gray-900">{viewingDetails.companies.map(c => c.NameCompany).join(', ')}</p>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7a96]">Empresas Asignadas</p>
+                      <p className="mt-0.5 text-sm text-slate-800">{viewingDetails.companies.map(c => c.NameCompany).join(', ')}</p>
                     </div>
                   )}
                 </div>
               </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setViewingDetails(null)}
+                  className="rounded-[12px] border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Permissions UI removed per request */}
-
+      {/* Permissions Modal */}
       {showPermissions && selectedUserForPermissions && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <UserPermissions

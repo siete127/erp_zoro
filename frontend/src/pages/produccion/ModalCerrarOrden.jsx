@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FaSave } from 'react-icons/fa';
 import { notify } from '../../services/notify';
+import api from '../../services/api';
 
 const ModalCerrarOrden = ({ orden, materiales, previewCierre, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -74,19 +75,11 @@ const ModalCerrarOrden = ({ orden, materiales, previewCierre, onClose, onSuccess
     setLoading(true);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/produccion/ordenes/${orden.OP_Id}/cerrar`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          consumos,
-          ...resultado
-        })
+      const res = await api.post(`/produccion/ordenes/${orden.OP_Id}/cerrar`, {
+        consumos,
+        ...resultado
       });
-
-      const data = await response.json();
+      const data = res.data;
 
       if (data.success) {
         if (data.data?.transferidoASolicitante) {
@@ -103,8 +96,7 @@ const ModalCerrarOrden = ({ orden, materiales, previewCierre, onClose, onSuccess
       } else {
         notify(data.message || 'Error al cerrar orden', 'error');
       }
-    } catch (error) {
-      console.error('Error:', error);
+    } catch {
       notify('Error al cerrar orden', 'error');
     } finally {
       setLoading(false);

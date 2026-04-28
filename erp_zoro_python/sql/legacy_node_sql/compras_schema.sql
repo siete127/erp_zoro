@@ -1,0 +1,158 @@
+/*
+  Módulo de Compras - ERP
+  SQL Server
+
+  Crea las tablas necesarias para:
+  - Órdenes de compra
+  - Detalle de orden de compra
+  - Doble autorización
+
+  Notas:
+  - Los proveedores se toman de ERP_CLIENT.
+  - Los productos deben existir previamente en ERP_PRODUCTOS.
+  - Las materias primas deben existir previamente en ERP_MATERIA_PRIMA.
+*/
+
+/* =========================================================
+   1) COMPRAS - ORDEN DE COMPRA (CABECERA)
+   ========================================================= */
+IF OBJECT_ID('dbo.ERP_COMPRA_ORDEN', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.ERP_COMPRA_ORDEN (
+    OC_Id INT IDENTITY(1,1) PRIMARY KEY,
+    NumeroOC NVARCHAR(50) NOT NULL,
+    Company_Id INT NOT NULL,
+    Proveedor_Id INT NOT NULL,
+    FechaOC DATETIME NOT NULL CONSTRAINT DF_ERP_COMPRA_ORDEN_FechaOC DEFAULT (GETDATE()),
+    FechaRequerida DATETIME NULL,
+    Moneda NVARCHAR(3) NOT NULL CONSTRAINT DF_ERP_COMPRA_ORDEN_Moneda DEFAULT ('MXN'),
+    Subtotal DECIMAL(18,2) NOT NULL CONSTRAINT DF_ERP_COMPRA_ORDEN_Subtotal DEFAULT (0),
+    IVA DECIMAL(18,2) NOT NULL CONSTRAINT DF_ERP_COMPRA_ORDEN_IVA DEFAULT (0),
+    Total DECIMAL(18,2) NOT NULL CONSTRAINT DF_ERP_COMPRA_ORDEN_Total DEFAULT (0),
+    Estatus NVARCHAR(30) NOT NULL CONSTRAINT DF_ERP_COMPRA_ORDEN_Estatus DEFAULT ('BORRADOR'),
+    RequiereDobleAutorizacion BIT NOT NULL CONSTRAINT DF_ERP_COMPRA_ORDEN_DobleAuth DEFAULT (1),
+    FacturaReferencia NVARCHAR(100) NULL,
+    FacturaArchivoUrl NVARCHAR(500) NULL,
+    PDFUrl NVARCHAR(500) NULL,
+    Observaciones NVARCHAR(1000) NULL,
+    CreatedBy NVARCHAR(100) NULL,
+    CreatedAt DATETIME NOT NULL CONSTRAINT DF_ERP_COMPRA_ORDEN_CreatedAt DEFAULT (GETDATE()),
+    UpdatedAt DATETIME NOT NULL CONSTRAINT DF_ERP_COMPRA_ORDEN_UpdatedAt DEFAULT (GETDATE()),
+    CONSTRAINT UQ_ERP_COMPRA_ORDEN_NumeroOC UNIQUE (NumeroOC),
+    CONSTRAINT FK_ERP_COMPRA_ORDEN_COMPANY FOREIGN KEY (Company_Id) REFERENCES dbo.ERP_COMPANY(Company_Id),
+    CONSTRAINT FK_ERP_COMPRA_ORDEN_PROVEEDOR FOREIGN KEY (Proveedor_Id) REFERENCES dbo.ERP_CLIENT(Client_Id),
+    CONSTRAINT CK_ERP_COMPRA_ORDEN_Estatus CHECK (
+      Estatus IN ('BORRADOR', 'PENDIENTE_AUTORIZACION', 'AUTORIZADA', 'RECHAZADA', 'COMPRADA', 'CANCELADA')
+    ),
+    CONSTRAINT CK_ERP_COMPRA_ORDEN_Montos CHECK (
+      Subtotal >= 0 AND IVA >= 0 AND Total >= 0
+    )
+  );
+
+  CREATE INDEX IX_ERP_COMPRA_ORDEN_Company_Estatus
+    ON dbo.ERP_COMPRA_ORDEN (Company_Id, Estatus, FechaOC DESC);
+
+  CREATE INDEX IX_ERP_COMPRA_ORDEN_Proveedor
+    ON dbo.ERP_COMPRA_ORDEN (Proveedor_Id, FechaOC DESC);
+END;
+GO
+
+/* =========================================================
+   2) COMPRAS - ORDEN DE COMPRA (DETALLE)
+   ========================================================= */
+IF OBJECT_ID('dbo.ERP_COMPRA_ORDEN_DETALLE', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.ERP_COMPRA_ORDEN_DETALLE (
+    OC_Detalle_Id INT IDENTITY(1,1) PRIMARY KEY,
+    OC_Id INT NOT NULL,
+    Producto_Id INT NULL,
+    MateriaPrima_Id INT NULL,
+    Descripcion NVARCHAR(300) NOT NULL,
+    Cantidad DECIMAL(18,4) NOT NULL,
+    PrecioCompra DECIMAL(18,6) NOT NULL,
+    Subtotal DECIMAL(18,2) NOT NULL,
+    IVA DECIMAL(18,2) NOT NULL CONSTRAINT DF_ERP_COMPRA_ORDEN_DETALLE_IVA DEFAULT (0),
+    Total DECIMAL(18,2) NOT NULL,
+    CONSTRAINT FK_ERP_COMPRA_ORDEN_DETALLE_OC FOREIGN KEY (OC_Id) REFERENCES dbo.ERP_COMPRA_ORDEN(OC_Id),
+    CONSTRAINT FK_ERP_COMPRA_ORDEN_DETALLE_PRODUCTO FOREIGN KEY (Producto_Id) REFERENCES dbo.ERP_PRODUCTOS(Producto_Id),
+    CONSTRAINT FK_ERP_COMPRA_ORDEN_DETALLE_MP FOREIGN KEY (MateriaPrima_Id) REFERENCES dbo.ERP_MATERIA_PRIMA(MateriaPrima_Id),
+    CONSTRAINT CK_ERP_COMPRA_ORDEN_DETALLE_Origen CHECK (
+      (CASE WHEN Producto_Id IS NULL THEN 0 ELSE 1 END) +
+      (CASE WHEN MateriaPrima_Id IS NULL THEN 0 ELSE 1 END) = 1
+    ),
+    CONSTRAINT CK_ERP_COMPRA_ORDEN_DETALLE_Pos CHECK (
+      Cantidad > 0 AND PrecioCompra >= 0 AND Subtotal >= 0 AND IVA >= 0 AND Total >= 0
+    )
+  );
+
+  CREATE INDEX IX_ERP_COMPRA_ORDEN_DETALLE_OC
+    ON dbo.ERP_COMPRA_ORDEN_DETALLE (OC_Id);
+
+  CREATE INDEX IX_ERP_COMPRA_ORDEN_DETALLE_PRODUCTO
+    ON dbo.ERP_COMPRA_ORDEN_DETALLE (Producto_Id)
+    WHERE Producto_Id IS NOT NULL;
+
+  CREATE INDEX IX_ERP_COMPRA_ORDEN_DETALLE_MP
+    ON dbo.ERP_COMPRA_ORDEN_DETALLE (MateriaPrima_Id)
+    WHERE MateriaPrima_Id IS NOT NULL;
+END;
+GO
+
+/* =========================================================
+   3) COMPRAS - AUTORIZACIONES (DOBLE AUTORIZACIÓN)
+   ========================================================= */
+IF OBJECT_ID('dbo.ERP_COMPRA_AUTORIZACION', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.ERP_COMPRA_AUTORIZACION (
+    OC_Autorizacion_Id INT IDENTITY(1,1) PRIMARY KEY,
+    OC_Id INT NOT NULL,
+    Nivel INT NOT NULL,
+    User_Id INT NULL,
+    Aprobado BIT NOT NULL,
+    FechaDecision DATETIME NOT NULL CONSTRAINT DF_ERP_COMPRA_AUTORIZACION_Fecha DEFAULT (GETDATE()),
+    Comentarios NVARCHAR(500) NULL,
+    CONSTRAINT FK_ERP_COMPRA_AUTORIZACION_OC FOREIGN KEY (OC_Id) REFERENCES dbo.ERP_COMPRA_ORDEN(OC_Id),
+    CONSTRAINT FK_ERP_COMPRA_AUTORIZACION_USER FOREIGN KEY (User_Id) REFERENCES dbo.ERP_USERS(User_Id),
+    CONSTRAINT CK_ERP_COMPRA_AUTORIZACION_Nivel CHECK (Nivel IN (1, 2)),
+    CONSTRAINT UQ_ERP_COMPRA_AUTORIZACION_OC_Nivel UNIQUE (OC_Id, Nivel)
+  );
+
+  CREATE INDEX IX_ERP_COMPRA_AUTORIZACION_OC
+    ON dbo.ERP_COMPRA_AUTORIZACION (OC_Id, Nivel);
+END;
+GO
+
+/* =========================================================
+   4) AJUSTES COMPATIBLES SI LA TABLA YA EXISTE
+   ========================================================= */
+IF OBJECT_ID('dbo.ERP_COMPRA_ORDEN', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.ERP_COMPRA_ORDEN', 'FacturaReferencia') IS NULL
+  BEGIN
+    ALTER TABLE dbo.ERP_COMPRA_ORDEN
+      ADD FacturaReferencia NVARCHAR(100) NULL;
+  END;
+
+  IF COL_LENGTH('dbo.ERP_COMPRA_ORDEN', 'PDFUrl') IS NULL
+  BEGIN
+    ALTER TABLE dbo.ERP_COMPRA_ORDEN
+      ADD PDFUrl NVARCHAR(500) NULL;
+  END;
+
+  IF COL_LENGTH('dbo.ERP_COMPRA_ORDEN', 'FacturaArchivoUrl') IS NULL
+  BEGIN
+    ALTER TABLE dbo.ERP_COMPRA_ORDEN
+      ADD FacturaArchivoUrl NVARCHAR(500) NULL;
+  END;
+
+  IF COL_LENGTH('dbo.ERP_COMPRA_ORDEN', 'RequiereDobleAutorizacion') IS NULL
+  BEGIN
+    ALTER TABLE dbo.ERP_COMPRA_ORDEN
+      ADD RequiereDobleAutorizacion BIT NOT NULL
+      CONSTRAINT DF_ERP_COMPRA_ORDEN_DobleAuth_TMP DEFAULT (1);
+  END;
+END;
+GO
+
+PRINT 'Schema de Compras ejecutado correctamente.';
+GO

@@ -19,11 +19,31 @@ async function ensureRhModuleExists() {
   `);
 }
 
+async function ensureAccountingModuleExists() {
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM ERP_MODULES WHERE LOWER(LTRIM(RTRIM(ModuleKey))) = 'accounting')
+    BEGIN
+      INSERT INTO ERP_MODULES (ModuleKey, ModuleName, Description, IsActive)
+      VALUES ('accounting', 'Contabilidad', 'Módulo de contabilidad: catálogos, balanzas y reportes financieros', 1)
+    END
+    ELSE
+    BEGIN
+      UPDATE ERP_MODULES
+      SET ModuleKey = LOWER(LTRIM(RTRIM(ModuleKey))),
+          ModuleName = CASE WHEN ModuleName IS NULL OR LTRIM(RTRIM(ModuleName)) = '' THEN 'Contabilidad' ELSE ModuleName END,
+          Description = COALESCE(Description, 'Módulo de contabilidad: catálogos, balanzas y reportes financieros'),
+          IsActive = 1
+      WHERE LOWER(LTRIM(RTRIM(ModuleKey))) = 'accounting'
+    END
+  `);
+}
+
 // Obtener todos los módulos disponibles
 exports.getModules = async (req, res) => {
   try {
     await pool.connect();
     await ensureRhModuleExists();
+    await ensureAccountingModuleExists();
     const result = await pool.request().query('SELECT * FROM ERP_MODULES WHERE IsActive = 1 ORDER BY ModuleName');
     res.json({ success: true, data: result.recordset });
   } catch (error) {
@@ -38,6 +58,7 @@ exports.getUserPermissions = async (req, res) => {
     const { userId } = req.params;
     await pool.connect();
     await ensureRhModuleExists();
+    await ensureAccountingModuleExists();
     
     const result = await pool.request()
       .input('User_Id', sql.Int, userId)
@@ -74,6 +95,7 @@ exports.updateUserPermissions = async (req, res) => {
     
     await pool.connect();
     await ensureRhModuleExists();
+    await ensureAccountingModuleExists();
     const transaction = new sql.Transaction(pool);
     await transaction.begin();
     

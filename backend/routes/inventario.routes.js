@@ -10,6 +10,8 @@ router.put("/consolidado", verifyToken, inventarioController.updateEstadoConsoli
 // ── Inventario de Materia Prima ─────────────────────────────────────────
 router.get("/mp", verifyToken, inventarioController.listStockMP);
 router.put("/mp", verifyToken, inventarioController.updateStockMP);
+router.get("/mp/maquinas", verifyToken, inventarioController.listMateriaPrimaPorMaquina);
+router.post("/mp/maquinas", verifyToken, inventarioController.saveMateriaPrimaPorMaquina);
 
 // ── Lista de productos listos para recepción en almacén ────────────────
 router.get("/recepcion/pendientes", verifyToken, inventarioController.listRecepcionPendiente);

@@ -55,7 +55,7 @@ export default function ClientCreate({ editMode = false, initialData = null, onC
     };
     const fetchCompanies = async () => {
       try {
-        const res = await api.get('/companies');
+        const res = await api.get('/companies/');
         if (mounted) setCompanies(res.data || []);
       } catch (err) {
         console.error('Error cargando empresas', err);
@@ -296,9 +296,9 @@ export default function ClientCreate({ editMode = false, initialData = null, onC
   };
 
   return (
-    <div className="w-full max-h-[95vh] bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
-      <div className="bg-[#092052] px-6 py-4 flex-shrink-0">
-        <h2 className="text-xl font-bold text-white">{editMode ? 'Editar Cliente' : 'Nuevo Cliente'}</h2>
+    <div className="w-full max-h-[95vh] overflow-hidden rounded-[26px] shadow-2xl flex flex-col">
+      <div className="flex-shrink-0 bg-gradient-to-r from-[#1b3d86] to-[#2a5fc4] px-6 py-4 flex items-center justify-between">
+        <h2 className="text-base font-bold text-white">{editMode ? 'Editar Cliente' : 'Nuevo Cliente'}</h2>
       </div>
       
       <div className="flex-1 overflow-y-auto">
@@ -307,7 +307,7 @@ export default function ClientCreate({ editMode = false, initialData = null, onC
             {/* Columna izquierda */}
             <div className="space-y-4">
               {/* Info básica */}
-              <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 space-y-3">
+              <div className="rounded-[20px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(245,248,255,0.92)_100%)] p-4 shadow-[0_4px_16px_rgba(15,45,93,0.07)] space-y-3">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-bold text-gray-900">Información General</h3>
                   <div>
@@ -321,10 +321,10 @@ export default function ClientCreate({ editMode = false, initialData = null, onC
                     />
                     <label
                       htmlFor="constanciaInput"
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg cursor-pointer transition-all ${
+                      className={`rounded-[10px] px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all ${
                         uploadingConstancia
-                          ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
-                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                          ? 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
+                          : 'border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
                       }`}
                     >
                       {uploadingConstancia ? '⏳ Cargando...' : '📄 Cargar Constancia'}
@@ -335,47 +335,47 @@ export default function ClientCreate({ editMode = false, initialData = null, onC
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
                     Razón Social * {editMode && form.LegalName && <span className="ml-1 text-green-600">✓</span>}
                   </label>
-                  <input name="LegalName" value={form.LegalName} onChange={handleChange} className={`w-full h-9 px-3 text-sm rounded-lg border-2 ${editMode && form.LegalName ? 'border-green-500 bg-green-50' : 'border-gray-300 bg-white'} text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]`} />
+                  <input name="LegalName" value={form.LegalName} onChange={handleChange} className={`w-full rounded-[12px] border px-3 py-2 text-sm outline-none transition focus:ring-2 ${editMode && form.LegalName ? 'border-emerald-400 bg-emerald-50 text-slate-800 focus:ring-emerald-400/20' : 'border-[#dce4f0] bg-white text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.05)] focus:border-[#3b6fd4] focus:ring-[#3b6fd4]/20'}`} />
                   {errors.LegalName && <p className="mt-1 text-xs text-red-600">{errors.LegalName}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
                     Nombre Comercial {editMode && form.CommercialName && <span className="ml-1 text-green-600">✓</span>}
                   </label>
-                  <input name="CommercialName" value={form.CommercialName} onChange={handleChange} className={`w-full h-9 px-3 text-sm rounded-lg border-2 ${editMode && form.CommercialName ? 'border-green-500 bg-green-50' : 'border-gray-300 bg-white'} text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]`} />
+                  <input name="CommercialName" value={form.CommercialName} onChange={handleChange} className={`w-full rounded-[12px] border px-3 py-2 text-sm outline-none transition focus:ring-2 ${editMode && form.CommercialName ? 'border-emerald-400 bg-emerald-50 text-slate-800 focus:ring-emerald-400/20' : 'border-[#dce4f0] bg-white text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.05)] focus:border-[#3b6fd4] focus:ring-[#3b6fd4]/20'}`} />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
                     RFC {editMode && form.RFC && <span className="ml-1 text-green-600">✓</span>}
                   </label>
-                  <input name="RFC" value={form.RFC} onChange={handleChange} className={`w-full h-9 px-3 text-sm rounded-lg border-2 ${editMode && form.RFC ? 'border-green-500 bg-green-50' : 'border-gray-300 bg-white'} text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052] uppercase`} />
+                  <input name="RFC" value={form.RFC} onChange={handleChange} className={`w-full rounded-[12px] border px-3 py-2 text-sm uppercase outline-none transition focus:ring-2 ${editMode && form.RFC ? 'border-emerald-400 bg-emerald-50 text-slate-800 focus:ring-emerald-400/20' : 'border-[#dce4f0] bg-white text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.05)] focus:border-[#3b6fd4] focus:ring-[#3b6fd4]/20'}`} />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">Estado</label>
-                    <select name="Status" value={form.Status} onChange={handleChange} className="w-full h-9 px-3 text-sm rounded-lg border-2 border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]">
+                    <select name="Status" value={form.Status} onChange={handleChange} className="w-full rounded-[12px] border border-[#dce4f0] bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.05)] outline-none transition focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20">
                       {allowedStatus.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
                   <div className="lg:col-span-2">
                     <label className="block text-xs font-semibold text-gray-700 mb-2">Empresas</label>
-                    <div className="bg-white border-2 border-gray-300 rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
+                    <div className="rounded-[12px] border border-[#dce4f0] bg-white p-3 space-y-1.5 max-h-48 overflow-y-auto shadow-[0_2px_8px_rgba(15,45,93,0.04)]">
                       {companies.length > 0 ? (
                         companies.map(c => (
-                          <label key={c.Company_Id} className="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded">
+                          <label key={c.Company_Id} className="flex items-center cursor-pointer rounded-lg px-2 py-1 transition hover:bg-slate-50">
                             <input
                               type="checkbox"
                               name="Company_Ids"
                               value={c.Company_Id}
                               checked={form.Company_Ids.includes(c.Company_Id)}
                               onChange={handleChange}
-                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-[#092052]"
+                              className="h-4 w-4 rounded border-slate-300 text-[#3b6fd4] focus:ring-[#3b6fd4]/30"
                             />
-                            <span className="ml-2 text-sm text-gray-700">{c.NameCompany}</span>
+                            <span className="ml-2 text-sm text-slate-700">{c.NameCompany}</span>
                           </label>
                         ))
                       ) : (
-                        <p className="text-xs text-gray-500">Cargando empresas...</p>
+                        <p className="text-xs text-slate-400">Cargando empresas...</p>
                       )}
                     </div>
                     {form.Company_Ids.length > 0 && (
@@ -388,13 +388,13 @@ export default function ClientCreate({ editMode = false, initialData = null, onC
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
                       Régimen Fiscal {editMode && form.TaxRegime && <span className="ml-1 text-green-600">✓</span>}
                     </label>
-                    <input name="TaxRegime" value={form.TaxRegime} onChange={handleChange} className={`w-full h-9 px-3 text-sm rounded-lg border-2 ${editMode && form.TaxRegime ? 'border-green-500 bg-green-50' : 'border-gray-300 bg-white'} text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]`} />
+                    <input name="TaxRegime" value={form.TaxRegime} onChange={handleChange} className={`w-full rounded-[12px] border px-3 py-2 text-sm outline-none transition focus:ring-2 ${editMode && form.TaxRegime ? 'border-emerald-400 bg-emerald-50 text-slate-800 focus:ring-emerald-400/20' : 'border-[#dce4f0] bg-white text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.05)] focus:border-[#3b6fd4] focus:ring-[#3b6fd4]/20'}`} />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
                       Tipo {editMode && form.ClientType && <span className="ml-1 text-green-600">✓</span>}
                     </label>
-                    <input name="ClientType" value={form.ClientType} onChange={handleChange} className={`w-full h-9 px-3 text-sm rounded-lg border-2 ${editMode && form.ClientType ? 'border-green-500 bg-green-50' : 'border-gray-300 bg-white'} text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]`} />
+                    <input name="ClientType" value={form.ClientType} onChange={handleChange} className={`w-full rounded-[12px] border px-3 py-2 text-sm outline-none transition focus:ring-2 ${editMode && form.ClientType ? 'border-emerald-400 bg-emerald-50 text-slate-800 focus:ring-emerald-400/20' : 'border-[#dce4f0] bg-white text-slate-800 shadow-[0_2px_8px_rgba(15,45,93,0.05)] focus:border-[#3b6fd4] focus:ring-[#3b6fd4]/20'}`} />
                   </div>
                 </div>
               </div>
@@ -403,17 +403,17 @@ export default function ClientCreate({ editMode = false, initialData = null, onC
             {/* Columna derecha */}
             <div className="space-y-4">
               {/* Direcciones */}
-              <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
-                <button type="button" onClick={() => setShowAddresses(!showAddresses)} className="w-full flex items-center justify-between px-4 py-2 bg-gray-100 hover:bg-gray-200">
+              <div className="rounded-[20px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(245,248,255,0.92)_100%)] shadow-[0_4px_16px_rgba(15,45,93,0.07)] overflow-hidden">
+                <button type="button" onClick={() => setShowAddresses(!showAddresses)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#f4f7ff]/60 transition">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-gray-900">Direcciones</span>
-                    <span className="px-2 py-0.5 bg-indigo-500 text-white text-xs font-bold rounded-full">{addresses.length}</span>
+                    <span className="text-sm font-bold text-[#0d1f3c]">Direcciones</span>
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#1b3d86] text-[10px] font-bold text-white">{addresses.length}</span>
                   </div>
                   <svg className={`w-4 h-4 transition-transform text-gray-700 ${showAddresses ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                 </button>
                 {showAddresses && (
                   <div className="p-4 space-y-3">
-                    <button type="button" onMouseDown={(e) => { e.preventDefault(); if (!addingAddress && addresses.length < 3) addAddress(); }} disabled={addingAddress || addresses.length >= 3} className="w-full px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg disabled:opacity-50 disabled:pointer-events-none">
+                    <button type="button" onMouseDown={(e) => { e.preventDefault(); if (!addingAddress && addresses.length < 3) addAddress(); }} disabled={addingAddress || addresses.length >= 3} className="w-full rounded-[12px] border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:pointer-events-none">
                       + Agregar {addresses.length >= 3 ? '(Máx. 3)' : `(${addresses.length}/3)`}
                     </button>
                     {addresses.map((a, idx) => {
@@ -421,11 +421,11 @@ export default function ClientCreate({ editMode = false, initialData = null, onC
                       const addressSummary = a.AddressType || 'Dirección';
                       const hasFilled = a.Street && a.City && a.State;
                       return (
-                        <div key={a._uid} className={`rounded-lg overflow-hidden border ${editMode && a.Address_Id ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'}`}>
+                        <div key={a._uid} className={`rounded-[14px] overflow-hidden border ${editMode && a.Address_Id ? 'border-emerald-300 bg-emerald-50/40' : 'border-[#eaf0fa] bg-white'}`}>
                           <button
                             type="button"
                             onClick={() => setExpandedAddresses(prev => ({ ...prev, [a._uid]: !isExpanded }))}
-                            className={`w-full flex items-center justify-between px-3 py-2 ${hasFilled ? 'bg-green-100 hover:bg-green-200' : 'bg-gray-100 hover:bg-gray-200'}`}
+                            className={`w-full flex items-center justify-between px-3 py-2.5 transition ${hasFilled ? 'bg-emerald-50 hover:bg-emerald-100' : 'bg-[#f4f7ff]/80 hover:bg-[#eaf0fa]'}`}
                           >
                             <div className="flex items-center gap-2 text-left">
                               <span className="text-xs font-bold text-gray-700">#{idx + 1} - {addressSummary}</span>
@@ -441,17 +441,17 @@ export default function ClientCreate({ editMode = false, initialData = null, onC
                                 <div className="flex items-center gap-2">
                                   {editMode && a.Address_Id && <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded-full">Existente</span>}
                                 </div>
-                                <button type="button" onClick={() => removeAddressAt(a._uid)} className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded">Eliminar</button>
+                                <button type="button" onClick={() => removeAddressAt(a._uid)} className="rounded-[8px] border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition">Eliminar</button>
                               </div>
-                              <input value={a.AddressType || ''} onChange={(e) => updateAddress(a._uid, 'AddressType', e.target.value)} placeholder="Tipo (Fiscal, Entrega...)" className="w-full h-8 px-2 text-xs rounded border-2 border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
-                              <input value={a.Street || ''} onChange={(e) => updateAddress(a._uid, 'Street', e.target.value)} placeholder="Calle *" className="w-full h-8 px-2 text-xs rounded border-2 border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
+                              <input value={a.AddressType || ''} onChange={(e) => updateAddress(a._uid, 'AddressType', e.target.value)} placeholder="Tipo (Fiscal, Entrega...)" className="w-full rounded-[10px] border border-[#dce4f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
+                              <input value={a.Street || ''} onChange={(e) => updateAddress(a._uid, 'Street', e.target.value)} placeholder="Calle *" className="w-full rounded-[10px] border border-[#dce4f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
                               <div className="grid grid-cols-2 gap-2">
-                                <input value={a.City || ''} onChange={(e) => updateAddress(a._uid, 'City', e.target.value)} placeholder="Ciudad" className="w-full h-8 px-2 text-xs rounded border-2 border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
-                                <input value={a.State || ''} onChange={(e) => updateAddress(a._uid, 'State', e.target.value)} placeholder="Estado" className="w-full h-8 px-2 text-xs rounded border-2 border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
+                                <input value={a.City || ''} onChange={(e) => updateAddress(a._uid, 'City', e.target.value)} placeholder="Ciudad" className="w-full rounded-[10px] border border-[#dce4f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
+                                <input value={a.State || ''} onChange={(e) => updateAddress(a._uid, 'State', e.target.value)} placeholder="Estado" className="w-full rounded-[10px] border border-[#dce4f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
                               </div>
                               <div className="grid grid-cols-2 gap-2">
-                                <input value={a.PostalCode || ''} onChange={(e) => updateAddress(a._uid, 'PostalCode', e.target.value)} placeholder="C.P." className="w-full h-8 px-2 text-xs rounded border-2 border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
-                                <input value={a.Country || ''} onChange={(e) => updateAddress(a._uid, 'Country', e.target.value)} placeholder="País" className="w-full h-8 px-2 text-xs rounded border-2 border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
+                                <input value={a.PostalCode || ''} onChange={(e) => updateAddress(a._uid, 'PostalCode', e.target.value)} placeholder="C.P." className="w-full rounded-[10px] border border-[#dce4f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
+                                <input value={a.Country || ''} onChange={(e) => updateAddress(a._uid, 'Country', e.target.value)} placeholder="País" className="w-full rounded-[10px] border border-[#dce4f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
                               </div>
                               <label className="flex items-center gap-2 text-xs cursor-pointer">
                                 <input type="checkbox" checked={!!a.IsPrimary} onChange={(e) => updateAddress(a._uid, 'IsPrimary', e.target.checked)} className="w-4 h-4" />
@@ -467,17 +467,17 @@ export default function ClientCreate({ editMode = false, initialData = null, onC
               </div>
 
               {/* Contactos */}
-              <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
-                <button type="button" onClick={() => setShowContacts(!showContacts)} className="w-full flex items-center justify-between px-4 py-2 bg-gray-100 hover:bg-gray-200">
+              <div className="rounded-[20px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(245,248,255,0.92)_100%)] shadow-[0_4px_16px_rgba(15,45,93,0.07)] overflow-hidden">
+                <button type="button" onClick={() => setShowContacts(!showContacts)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#f4f7ff]/60 transition">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-gray-900">Contactos</span>
-                    <span className="px-2 py-0.5 bg-purple-500 text-white text-xs font-bold rounded-full">{contacts.length}</span>
+                    <span className="text-sm font-bold text-[#0d1f3c]">Contactos</span>
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-violet-500 text-[10px] font-bold text-white">{contacts.length}</span>
                   </div>
                   <svg className={`w-4 h-4 transition-transform text-gray-700 ${showContacts ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                 </button>
                 {showContacts && (
                   <div className="p-4 space-y-3">
-                    <button type="button" onMouseDown={(e) => { e.preventDefault(); if (!addingContact && contacts.length < 2) addContact(); }} disabled={addingContact || contacts.length >= 2} className="w-full px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg disabled:opacity-50 disabled:pointer-events-none">
+                    <button type="button" onMouseDown={(e) => { e.preventDefault(); if (!addingContact && contacts.length < 2) addContact(); }} disabled={addingContact || contacts.length >= 2} className="w-full rounded-[12px] border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:pointer-events-none">
                       + Agregar {contacts.length >= 2 ? '(Máx. 2)' : `(${contacts.length}/2)`}
                     </button>
                     {contacts.map((c, idx) => {
@@ -485,11 +485,11 @@ export default function ClientCreate({ editMode = false, initialData = null, onC
                       const contactSummary = c.FullName || 'Contacto';
                       const hasFilled = c.FullName && (c.PhoneNumber || c.MobileNumber || c.Email);
                       return (
-                        <div key={c._uid} className={`rounded-lg overflow-hidden border ${editMode && c.Contact_Id ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'}`}>
+                        <div key={c._uid} className={`rounded-[14px] overflow-hidden border ${editMode && c.Contact_Id ? 'border-emerald-300 bg-emerald-50/40' : 'border-[#eaf0fa] bg-white'}`}>
                           <button
                             type="button"
                             onClick={() => setExpandedContacts(prev => ({ ...prev, [c._uid]: !isExpanded }))}
-                            className={`w-full flex items-center justify-between px-3 py-2 ${hasFilled ? 'bg-purple-100 hover:bg-purple-200' : 'bg-gray-100 hover:bg-gray-200'}`}
+                            className={`w-full flex items-center justify-between px-3 py-2.5 transition ${hasFilled ? 'bg-violet-50 hover:bg-violet-100' : 'bg-[#f4f7ff]/80 hover:bg-[#eaf0fa]'}`}
                           >
                             <div className="flex items-center gap-2 text-left">
                               <span className="text-xs font-bold text-gray-700">#{idx + 1} - {contactSummary}</span>
@@ -505,15 +505,15 @@ export default function ClientCreate({ editMode = false, initialData = null, onC
                                 <div className="flex items-center gap-2">
                                   {editMode && c.Contact_Id && <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded-full">Existente</span>}
                                 </div>
-                                <button type="button" onClick={() => removeContactAt(c._uid)} className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded">Eliminar</button>
+                                <button type="button" onClick={() => removeContactAt(c._uid)} className="rounded-[8px] border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition">Eliminar</button>
                               </div>
-                              <input value={c.FullName || ''} onChange={(e) => updateContact(c._uid, 'FullName', e.target.value)} placeholder="Nombre completo" className="w-full h-8 px-2 text-xs rounded border-2 border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
+                              <input value={c.FullName || ''} onChange={(e) => updateContact(c._uid, 'FullName', e.target.value)} placeholder="Nombre completo" className="w-full rounded-[10px] border border-[#dce4f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
                               <div className="grid grid-cols-2 gap-2">
-                                <input value={c.PhoneNumber || ''} onChange={(e) => updateContact(c._uid, 'PhoneNumber', e.target.value)} placeholder="Teléfono" className="w-full h-8 px-2 text-xs rounded border-2 border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
-                                <input value={c.MobileNumber || ''} onChange={(e) => updateContact(c._uid, 'MobileNumber', e.target.value)} placeholder="Móvil" className="w-full h-8 px-2 text-xs rounded border-2 border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
+                                <input value={c.PhoneNumber || ''} onChange={(e) => updateContact(c._uid, 'PhoneNumber', e.target.value)} placeholder="Teléfono" className="w-full rounded-[10px] border border-[#dce4f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
+                                <input value={c.MobileNumber || ''} onChange={(e) => updateContact(c._uid, 'MobileNumber', e.target.value)} placeholder="Móvil" className="w-full rounded-[10px] border border-[#dce4f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
                               </div>
-                              <input type="email" value={c.Email || ''} onChange={(e) => updateContact(c._uid, 'Email', e.target.value)} placeholder="Email principal" className="w-full h-8 px-2 text-xs rounded border-2 border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
-                              <input type="email" value={c.SecondaryEmail || ''} onChange={(e) => updateContact(c._uid, 'SecondaryEmail', e.target.value)} placeholder="Email secundario" className="w-full h-8 px-2 text-xs rounded border-2 border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#092052]" />
+                              <input type="email" value={c.Email || ''} onChange={(e) => updateContact(c._uid, 'Email', e.target.value)} placeholder="Email principal" className="w-full rounded-[10px] border border-[#dce4f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
+                              <input type="email" value={c.SecondaryEmail || ''} onChange={(e) => updateContact(c._uid, 'SecondaryEmail', e.target.value)} placeholder="Email secundario" className="w-full rounded-[10px] border border-[#dce4f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20" />
                               <label className="flex items-center gap-2 text-xs cursor-pointer">
                                 <input type="checkbox" checked={!!c.IsPrimary} onChange={(e) => updateContact(c._uid, 'IsPrimary', e.target.checked)} className="w-4 h-4" />
                                 <span className="text-gray-700">Principal</span>
@@ -530,22 +530,27 @@ export default function ClientCreate({ editMode = false, initialData = null, onC
           </div>
 
           {/* Botón submit */}
-          {message && <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">{message}</div>}
-          {error && <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">{error}</div>}
+          {message && <div className="mt-3 rounded-[12px] border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</div>}
+          {error && <div className="mt-3 rounded-[12px] border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</div>}
         </form>
       </div>
 
-      {/* Footer con botón fijo */}
-      <div className="flex-shrink-0 border-t border-gray-200 bg-white px-6 py-4 flex gap-3">
-        <button type="button" onClick={onCancel} className="flex-1 h-10 bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold rounded-lg transition-all">
+      {/* Footer */}
+      <div className="flex-shrink-0 border-t border-[#eaf0fa] bg-white px-6 py-4 flex gap-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-1 rounded-[14px] border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-all"
+        >
           Cancelar
         </button>
-        <button 
+        <button
           form="clientForm"
-          type="submit" 
-          disabled={loading || !isFormValid()} 
-          className="flex-1 h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-          {loading ? (editMode ? 'Guardando...' : 'Creando...') : (editMode ? 'Guardar' : 'Crear Cliente')}
+          type="submit"
+          disabled={loading || !isFormValid()}
+          className="flex-1 rounded-[14px] bg-gradient-to-r from-[#1b3d86] to-[#2a5fc4] py-2.5 text-sm font-bold text-white shadow-[0_4px_14px_rgba(27,61,134,0.30)] transition-all hover:shadow-[0_6px_20px_rgba(27,61,134,0.40)] disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? (editMode ? 'Guardando…' : 'Creando…') : (editMode ? 'Guardar' : 'Crear Cliente')}
         </button>
       </div>
     </div>

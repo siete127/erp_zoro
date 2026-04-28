@@ -1,11 +1,6 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { notify } from '../services/notify';
-
-const getAuthHeader = () => {
-  const token = localStorage.getItem('token');
-  return { Authorization: `Bearer ${token}` };
-};
 
 const SalePriceChangeModal = ({ producto, clientId, onClose, onRequestCreated }) => {
   const defaultEmails = {
@@ -35,7 +30,7 @@ const SalePriceChangeModal = ({ producto, clientId, onClose, onRequestCreated })
     }
     
     try {
-      const response = await axios.post('/api/client-pricing/price-change-request', {
+      const response = await api.post('/client-pricing/price-change-request', {
         clientId,
         productId: producto.Producto_Id,
         newPrice: parseFloat(formData.newPrice),
@@ -43,8 +38,6 @@ const SalePriceChangeModal = ({ producto, clientId, onClose, onRequestCreated })
         approver2Email: formData.approver2Email,
         reason: formData.reason,
         saleId: null
-      }, {
-        headers: getAuthHeader()
       });
       
       onRequestCreated(response.data.requestId, producto.Producto_Id, parseFloat(formData.newPrice));

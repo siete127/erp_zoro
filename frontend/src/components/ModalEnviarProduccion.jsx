@@ -147,7 +147,7 @@ const ModalEnviarProduccion = ({ venta, productosConFaltante, onClose, onSuccess
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
         <p className="text-xs text-yellow-800">
           💡 Se crearán órdenes de producción asignadas a <strong>PTC REMA</strong> (empresa productora).
-          La venta quedará en estado "En Producción" hasta que PTC confirme y complete las órdenes.
+          La venta quedará en estado "Pendiente" hasta que se confirme y cambie a "Completada".
         </p>
       </div>
 

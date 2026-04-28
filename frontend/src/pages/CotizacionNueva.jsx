@@ -1,19 +1,95 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { cotizacionService } from "../services/cotizacionService";
+import { crmService } from "../services/crmService";
+import api from "../services/api";
 import { notify } from "../services/notify";
 import ClienteSelector from "./ventas/ClienteSelector";
 import ProductoBuscador from "./ventas/ProductoBuscador";
 
 function CotizacionNueva() {
+  const [searchParams] = useSearchParams();
+  const oportunidadId = searchParams.get("oportunidad_id");
+  const clientIdParam = searchParams.get("client_id");
+  const companyIdParam = searchParams.get("company_id");
   const [empresaCodigo, setEmpresaCodigo] = useState("PTC");
-  const [companyId] = useState(1); // TODO: permitir seleccionar compañía específica si aplica
-  const [cliente, setCliente] = useState({ ClienteRFC: "", ClienteNombre: "" });
+  const [companyId, setCompanyId] = useState(Number(companyIdParam) || 1); // TODO: permitir seleccionar compañía específica si aplica
+  const [cliente, setCliente] = useState({ Client_Id: "", ClienteRFC: "", ClienteNombre: "" });
   const [tab, setTab] = useState("CATALOGO");
   const [renglones, setRenglones] = useState([]);
   const [guardando, setGuardando] = useState(false);
   const [resumen, setResumen] = useState(null);
+  const [contextoCRM, setContextoCRM] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const cargarContexto = async () => {
+      const effectiveOpportunityId = oportunidadId ? Number(oportunidadId) : null;
+      const effectiveClientId = clientIdParam ? Number(clientIdParam) : null;
+      const effectiveCompanyId = companyIdParam ? Number(companyIdParam) : null;
+
+      if (effectiveCompanyId) {
+        setCompanyId(effectiveCompanyId);
+      }
+
+      if (!effectiveOpportunityId && !effectiveClientId) {
+        return;
+      }
+
+      try {
+        let currentClientId = effectiveClientId;
+
+        if (effectiveOpportunityId) {
+          const oppRes = await crmService.getOportunidad(effectiveOpportunityId);
+          const oppData = oppRes?.data || oppRes;
+          const currentOpportunity = oppData.oportunidad || oppData.Oportunidad || oppData;
+
+          if (!cancelled) {
+            setContextoCRM({
+              Oportunidad_Id: currentOpportunity?.Oportunidad_Id || effectiveOpportunityId,
+              NombreOportunidad: currentOpportunity?.NombreOportunidad || `Oportunidad #${effectiveOpportunityId}`,
+            });
+          }
+
+          if (currentOpportunity?.Company_Id) {
+            setCompanyId(Number(currentOpportunity.Company_Id));
+          }
+          if (currentOpportunity?.Client_Id) {
+            currentClientId = Number(currentOpportunity.Client_Id);
+          }
+        }
+
+        if (currentClientId) {
+          const clientRes = await api.get(`/clients/${currentClientId}`);
+          const clientData =
+            clientRes.data?.client ||
+            clientRes.data?.data?.client ||
+            clientRes.data?.data ||
+            clientRes.data;
+
+          if (!cancelled && clientData) {
+            setCliente({
+              Client_Id: clientData.Client_Id,
+              ClienteRFC: clientData.RFC || "",
+              ClienteNombre: clientData.LegalName || clientData.CommercialName || "",
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error al cargar contexto CRM para la cotización", error);
+        if (!cancelled) {
+          notify("No se pudo precargar la oportunidad/cliente vinculados", "warning");
+        }
+      }
+    };
+
+    cargarContexto();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientIdParam, companyIdParam, oportunidadId]);
 
   const handleClienteSelect = (data) => {
     setCliente(data);
@@ -78,7 +154,7 @@ function CotizacionNueva() {
   };
 
   const handleGuardar = async () => {
-    if (!cliente.ClienteRFC || !cliente.ClienteNombre) {
+    if (!cliente.Client_Id && (!cliente.ClienteRFC || !cliente.ClienteNombre)) {
       notify("Debe capturar los datos del cliente", "error");
       return;
     }
@@ -92,6 +168,8 @@ function CotizacionNueva() {
       const payload = {
         Company_Id: companyId,
         EmpresaCodigo: empresaCodigo,
+        Client_Id: cliente.Client_Id || null,
+        Oportunidad_Id: oportunidadId ? Number(oportunidadId) : null,
         ClienteRFC: cliente.ClienteRFC,
         ClienteNombre: cliente.ClienteNombre,
         Moneda: "MXN",
@@ -127,37 +205,70 @@ function CotizacionNueva() {
     }
   };
 
+  const premiumFieldClass = "w-full rounded-[14px] border border-[#dce4f0] bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 shadow-[0_2px_8px_rgba(15,45,93,0.06)] outline-none transition focus:border-[#3b6fd4] focus:ring-2 focus:ring-[#3b6fd4]/20";
+
   return (
-    <div className="w-full h-screen bg-white rounded-none shadow-none p-6 overflow-auto">
-      <div className="flex items-center justify-between mb-4">
+    <div
+      className="min-h-screen w-full px-4 sm:px-6 py-6"
+      style={{ background: "radial-gradient(ellipse at 70% 0%, rgba(59,107,212,0.07) 0%, rgba(255,255,255,0) 60%), radial-gradient(ellipse at 0% 80%, rgba(99,102,241,0.05) 0%, rgba(255,255,255,0) 55%), #f4f6fb" }}
+    >
+      <div className="mx-auto max-w-7xl space-y-5">
+
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Nueva cotización</h2>
-          <p className="text-sm text-gray-600">Flujo de cotización con empresa, cliente y renglones de catálogo / PTC.</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#3b6fd4]">Ventas</p>
+          <h1 className="text-2xl font-bold text-[#0d1f3c]">Nueva cotización</h1>
+          <p className="text-sm text-slate-500">Flujo de cotización con empresa, cliente y renglones de catálogo / PTC.</p>
         </div>
       </div>
 
+      <div className="rounded-[24px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(245,248,255,0.9)_100%)] p-5 shadow-[0_4px_20px_rgba(15,45,93,0.07)]">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-sm">
         <div>
-          <label className="block text-gray-700 mb-1">Empresa (emisor)</label>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Empresa (emisor)</label>
           <select
             value={empresaCodigo}
             onChange={(e) => setEmpresaCodigo(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+            className={premiumFieldClass}
           >
             <option value="CALI">CALI</option>
             <option value="REMA">REMA</option>
             <option value="PTC">PTC</option>
           </select>
         </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Company_Id</label>
+          <input
+            type="text"
+            value={companyId}
+            readOnly
+            className="w-full rounded-[14px] border border-[#eaf0fa] bg-slate-50 px-3.5 py-2.5 text-sm text-slate-500 cursor-not-allowed"
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Contexto CRM</label>
+          <div className="w-full rounded-[14px] border border-[#dce4f0] bg-white px-3.5 py-2.5 text-sm min-h-[42px]">
+            {contextoCRM ? (
+              <>
+                Oportunidad #{contextoCRM.Oportunidad_Id}
+                <div className="text-xs text-gray-600 mt-1">{contextoCRM.NombreOportunidad}</div>
+              </>
+            ) : (
+              <span className="text-gray-500">Sin oportunidad vinculada</span>
+            )}
+          </div>
+        </div>
       </div>
 
       <ClienteSelector onClienteSelect={handleClienteSelect} clienteData={cliente} />
 
-      <div className="mb-3 flex gap-4 text-sm border-b border-gray-200">
+      </div>{/* end premiumSectionClass */}
+
+      <div className="mb-3 flex gap-4 text-sm border-b border-[#eaf0fa]">
         <button
           type="button"
-          className={`pb-2 px-1 border-b-2 ${
-            tab === "CATALOGO" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-600"
+          className={`pb-2 px-1 border-b-2 font-semibold text-sm ${
+            tab === "CATALOGO" ? "border-[#3b6fd4] text-[#3b6fd4]" : "border-transparent text-slate-500 hover:text-slate-700"
           }`}
           onClick={() => setTab("CATALOGO")}
         >
@@ -165,8 +276,8 @@ function CotizacionNueva() {
         </button>
         <button
           type="button"
-          className={`pb-2 px-1 border-b-2 ${
-            tab === "PTC" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-600"
+          className={`pb-2 px-1 border-b-2 font-semibold text-sm ${
+            tab === "PTC" ? "border-[#3b6fd4] text-[#3b6fd4]" : "border-transparent text-slate-500 hover:text-slate-700"
           }`}
           onClick={() => setTab("PTC")}
         >
@@ -200,10 +311,10 @@ function CotizacionNueva() {
 
         <div>
           <h3 className="text-sm font-semibold text-gray-900 mb-2">Renglones de la cotización</h3>
-          <div className="border border-gray-200 rounded max-h-80 overflow-auto text-xs">
+          <div className="rounded-[18px] border border-[#eaf0fa] overflow-auto max-h-80 text-xs">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-50 text-gray-600">
+                <tr className="bg-[#f4f7ff] text-[#6b7a96]">
                   <th className="py-1 px-2">Tipo</th>
                   <th className="py-1 px-2">Descripción</th>
                   <th className="py-1 px-2 w-20 text-right">Cant.</th>
@@ -221,7 +332,7 @@ function CotizacionNueva() {
                   </tr>
                 )}
                 {renglones.map((r, idx) => (
-                  <tr key={idx} className="border-t border-gray-200">
+                  <tr key={idx} className="border-t border-[#eaf0fa]">
                     <td className="py-1 px-2 text-gray-800">{r.TipoProducto}</td>
                     <td className="py-1 px-2 text-gray-800">
                       <input
@@ -282,19 +393,21 @@ function CotizacionNueva() {
       <div className="flex justify-end gap-2 mt-4">
         <button
           onClick={() => navigate("/cotizaciones")}
-          className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
+          className="rounded-[14px] border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
           disabled={guardando}
         >
           Cancelar
         </button>
         <button
           onClick={handleGuardar}
-          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm disabled:bg-gray-400"
+          className="rounded-[14px] bg-gradient-to-r from-[#1b3d86] to-[#2a5fc4] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(27,61,134,0.30)] hover:shadow-[0_6px_20px_rgba(27,61,134,0.40)] disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={guardando}
         >
-          {guardando ? "Guardando..." : "Guardar cotización"}
+          {guardando ? "Guardando…" : "Guardar cotización"}
         </button>
       </div>
+
+      </div>{/* end max-w container */}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { ventaService } from "../services/ventaService";
 import { notify } from "../services/notify";
 import ProductoBuscador from "../pages/ventas/ProductoBuscador";
 import TablaProductos from "../pages/ventas/TablaProductos";
-import axios from "axios";
+import api from "../services/api";
 import io from "socket.io-client";
 import { getSocketUrl } from "../services/socketConfig";
 
@@ -91,11 +91,7 @@ function ModalEditarVenta({ ventaId, isOpen, onClose, onSuccess }) {
 
   const handleCompletarVenta = async () => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(`/api/ventas/${ventaId}`, 
-        { Status_Id: 2 },
-        { headers: { Authorization: `Bearer ${token}` }}
-      );
+      await api.put(`/ventas/${ventaId}`, { Status_Id: 2 });
       notify('Venta completada exitosamente', 'success');
       onSuccess();
       onClose();

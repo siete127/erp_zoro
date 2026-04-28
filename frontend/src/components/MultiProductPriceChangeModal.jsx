@@ -1,11 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { notify } from '../services/notify';
-
-const getAuthHeader = () => {
-  const token = localStorage.getItem('token');
-  return { Authorization: `Bearer ${token}` };
-};
 
 const MultiProductPriceChangeModal = ({ productos, clientId, onClose, onRequestCreated }) => {
   const [formData, setFormData] = useState({
@@ -22,9 +17,7 @@ const MultiProductPriceChangeModal = ({ productos, clientId, onClose, onRequestC
       try {
         setLoadingEmails(true);
         // Intentar obtener correos directamente por client_id
-        const emailRes = await axios.get(`/api/config/precio-emails?client_id=${clientId}`, {
-          headers: getAuthHeader()
-        });
+        const emailRes = await api.get(`/config/precio-emails?client_id=${clientId}`);
         setFormData(prev => ({
           ...prev,
           approver1Email: emailRes.data.email1 || '',
@@ -65,15 +58,13 @@ const MultiProductPriceChangeModal = ({ productos, clientId, onClose, onRequestC
         newPrice: p.PrecioUnitario
       }));
 
-      const response = await axios.post('/api/client-pricing/multi-price-change-request', {
+      const response = await api.post('/client-pricing/multi-price-change-request', {
         clientId,
         products: productDetails,
         approver1Email: formData.approver1Email,
         approver2Email: formData.approver2Email,
         reason: formData.reason,
         saleId: null
-      }, {
-        headers: getAuthHeader()
       });
       
       onRequestCreated(response.data.requestId, productos);

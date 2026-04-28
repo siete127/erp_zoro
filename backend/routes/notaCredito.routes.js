@@ -10,5 +10,6 @@ router.post('/:id/timbrar', notaCreditoController.timbrarNotaCredito);
 router.get('/', notaCreditoController.getNotasCredito);
 router.get('/factura/:facturaId/productos', notaCreditoController.getProductosFactura);
 router.get('/:id', notaCreditoController.getNotaCreditoDetalle);
+router.get('/:id/pdf', notaCreditoController.descargarPdf);
 
 module.exports = router;

@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { notify } from '../../services/notify';
 import { socket } from '../../services/socket';
+import {
+  operationContainerClass,
+  operationPageClass,
+  operationSecondaryButtonClass,
+  OperationHeader,
+  OperationStat,
+} from '../../components/operation/OperationUI';
 
 const CLASIFICACION_LABELS = {
   MATERIA_PRIMA: { label: 'Materia Prima', color: 'bg-yellow-100 text-yellow-800' },
@@ -11,7 +18,7 @@ const CLASIFICACION_LABELS = {
 };
 
 function ClasificacionBadge({ value }) {
-  const cfg = CLASIFICACION_LABELS[value] || { label: value || '—', color: 'bg-gray-100 text-gray-600' };
+  const cfg = CLASIFICACION_LABELS[value] || { label: value || '-', color: 'bg-gray-100 text-gray-600' };
   return (
     <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${cfg.color}`}>
       {cfg.label}
@@ -27,7 +34,7 @@ export default function RecepcionPendiente() {
   const [userRole, setUserRole] = useState(null);
   const [filtroCompany, setFiltroCompany] = useState('all');
 
-  // Modal recepción manual
+  // Modal recepcion manual
   const [modalRow, setModalRow] = useState(null);
   const [form, setForm] = useState({ cantidad: '', observaciones: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -52,11 +59,13 @@ export default function RecepcionPendiente() {
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const res = await api.get('/companies');
+        const res = await api.get('/companies/');
         setCompanies(res.data || []);
         const user = JSON.parse(localStorage.getItem('user') || '{}');
         setUserRole(user.RolId);
-      } catch {}
+      } catch {
+        setCompanies([]);
+      }
     };
     fetchCompanies();
   }, []);
@@ -83,12 +92,12 @@ export default function RecepcionPendiente() {
         Almacen_Id: modalRow.AlmacenSugerido_Id || undefined,
         Observaciones: form.observaciones || undefined,
       });
-      notify(`Recepción registrada para ${modalRow.NombreProducto}`, 'success');
+      notify(`Recepcion registrada para ${modalRow.NombreProducto}`, 'success');
       setModalRow(null);
       setForm({ cantidad: '', observaciones: '' });
       fetchPendientes();
     } catch (err) {
-      notify(err.response?.data?.msg || 'Error al registrar recepción', 'error');
+      notify(err.response?.data?.msg || 'Error al registrar recepcion', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -98,7 +107,7 @@ export default function RecepcionPendiente() {
     if (!modalRow) return;
     const motivo = String(form.observaciones || '').trim();
     if (!motivo) {
-      notify('Escribe el motivo de cancelación por producto incompleto', 'warning');
+      notify('Escribe el motivo de cancelacion por producto incompleto', 'warning');
       return;
     }
 
@@ -123,171 +132,215 @@ export default function RecepcionPendiente() {
   const totalPendientes = pendientes.length;
 
   return (
-    <div className="w-full">
-      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white to-slate-50 p-4 sm:p-6 shadow-sm">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-5">
+    <div className={operationPageClass}>
+      <div className={operationContainerClass}>
+      <OperationHeader
+        eyebrow="Operacion"
+        title="Recepciones Pendientes"
+        description="Ordenes terminadas que aun no han sido recibidas en almacen, con registro rapido de entrada."
+        actions={<button onClick={fetchPendientes} className={operationSecondaryButtonClass}>Actualizar</button>}
+        stats={
+          <>
+            <OperationStat label="Pendientes" value={totalPendientes} tone={totalPendientes > 0 ? 'amber' : 'emerald'} />
+            <OperationStat label="Empresa filtro" value={filtroCompany === 'all' ? 'Todas' : String(filtroCompany)} tone="slate" />
+          </>
+        }
+      />
+      <section className="rounded-[28px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(245,248,255,0.93)_100%)] p-5 sm:p-6 lg:p-8 shadow-[0_8px_30px_rgba(15,45,93,0.09)] overflow-hidden">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <button
               onClick={() => navigate('/productos/inventario')}
               className="inline-flex items-center gap-1.5 text-sm text-[#092052] hover:text-[#15367a] font-medium mb-2"
             >
-              <span>←</span>
+              <span>{"\u2190"}</span>
               <span>Volver a Inventario</span>
             </button>
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Recepciones Pendientes</h2>
-            <p className="text-sm text-slate-600 mt-1.5 max-w-2xl">
-              Órdenes de producción terminadas cuyo producto aún no ha sido recibido en almacén.
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+              Ordenes de produccion terminadas cuyo producto aun no ha sido recibido en almacen.
             </p>
           </div>
-          <button
-            onClick={fetchPendientes}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 rounded-lg text-sm font-medium transition-colors"
-          >
-            <span>↻</span>
-            <span>Actualizar</span>
-          </button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 mb-5">
-          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border ${
+        <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className={`rounded-2xl border px-4 py-4 shadow-sm ${
             totalPendientes > 0
-              ? 'bg-amber-100 text-amber-800 border-amber-200'
-              : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+              ? 'border-amber-200 bg-amber-50 text-amber-900'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-900'
           }`}>
-            <span>{totalPendientes > 0 ? '⚠' : '✓'}</span>
-            <span>
-              {totalPendientes > 0
-                ? `${totalPendientes} ${totalPendientes === 1 ? 'OP pendiente' : 'OPs pendientes'} de recepción`
-                : 'Sin pendientes — todo recibido'}
-            </span>
-          </div>
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border border-slate-200 bg-white text-slate-700">
-            <span>📦</span>
-            <span>Recepciones por registrar</span>
-          </div>
-        </div>
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] opacity-70">Pendientes</div>
+              <div className="mt-2 flex items-end gap-2">
+                <span className="text-3xl font-extrabold leading-none">{totalPendientes}</span>
+                <span className="pb-1 text-sm font-medium">
+                  {totalPendientes === 1 ? 'orden por recibir' : 'órdenes por recibir'}
+                </span>
+              </div>
+              <div className="mt-2 text-sm">
+                {totalPendientes > 0 ? 'Requieren entrada de almacén.' : 'No hay recepciones por registrar.'}
+              </div>
+            </div>
 
-        {/* Filtro empresa */}
-        {isAdmin && (
-          <div className="mb-5">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Estado</div>
+              <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700">
+                <span>{totalPendientes > 0 ? '⚠' : '✓'}</span>
+                <span>{totalPendientes > 0 ? 'Recepciones pendientes' : 'Flujo al día'}</span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">Consulta y registra entradas cerradas de producción desde una sola vista.</p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:col-span-2 xl:col-span-1">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Resumen</div>
+              <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700">
+                <span>📦</span>
+                <span>Recepciones por registrar</span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">La lista se actualiza manualmente y también reacciona a eventos del sistema.</p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               Empresa
             </label>
-            <select
-              value={filtroCompany}
-              onChange={(e) => setFiltroCompany(e.target.value)}
-              className="w-full sm:w-auto min-w-[240px] px-3 py-2.5 rounded-lg border bg-white text-slate-900 border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#092052]/20"
-            >
-              <option value="all">Todas las empresas</option>
-              {companies.map(c => (
-                <option key={c.Company_Id} value={c.Company_Id}>{c.NameCompany}</option>
-              ))}
-            </select>
+            {isAdmin ? (
+              <select
+                value={filtroCompany}
+                onChange={(e) => setFiltroCompany(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#092052]/20"
+              >
+                <option value="all">Todas las empresas</option>
+                {companies.map(c => (
+                  <option key={c.Company_Id} value={c.Company_Id}>{c.NameCompany}</option>
+                ))}
+              </select>
+            ) : (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
+                El filtro por empresa está disponible para usuarios administradores.
+              </div>
+            )}
+            <p className="mt-3 text-xs leading-5 text-slate-500">
+              Usa este filtro para revisar pendientes por razón social sin perder contexto del listado.
+            </p>
           </div>
-        )}
-      </div>
+        </div>
+      </section>
 
       {loading ? (
-        <div className="mt-5 grid grid-cols-1 gap-3 max-w-5xl">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {[1, 2, 3].map((item) => (
-            <div key={item} className="animate-pulse border border-slate-200 rounded-xl p-4 bg-white">
-              <div className="h-4 bg-slate-200 rounded w-48 mb-3" />
-              <div className="h-3 bg-slate-100 rounded w-80 mb-2" />
-              <div className="h-3 bg-slate-100 rounded w-56" />
+            <div key={item} className="animate-pulse rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 h-5 w-48 rounded bg-slate-200" />
+              <div className="mb-3 h-4 w-full rounded bg-slate-100" />
+              <div className="mb-3 h-4 w-4/5 rounded bg-slate-100" />
+              <div className="h-10 w-36 rounded-xl bg-slate-100" />
             </div>
           ))}
         </div>
       ) : pendientes.length === 0 ? (
-        <div className="mt-5 flex flex-col items-center justify-center py-16 text-slate-400 border border-dashed border-slate-300 rounded-2xl bg-white">
+        <div className="flex flex-col items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-white py-16 text-slate-400 shadow-sm">
           <span className="text-5xl mb-3">📦</span>
           <p className="text-lg font-semibold text-slate-700">No hay recepciones pendientes</p>
-          <p className="text-sm mt-1 text-slate-500 text-center px-4">Todas las órdenes terminadas ya tienen entrada registrada en almacén.</p>
+          <p className="mt-1 px-4 text-center text-sm text-slate-500">Todas las órdenes terminadas ya tienen entrada registrada en almacén.</p>
         </div>
       ) : (
-        <div className="mt-5 grid grid-cols-1 gap-3 max-w-5xl">
+        <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {pendientes.map((row) => (
             <div
               key={row.OP_Id}
-              className="group border border-slate-200 bg-white rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 hover:shadow-md hover:border-[#092052]/20 transition-all"
+              className="group flex h-full flex-col gap-5 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-[#092052]/20 hover:shadow-md"
             >
-              {/* Info principal */}
-              <div className="flex-1 min-w-0 space-y-2">
-                {/* Fila 1: OP + SKU + Producto */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-sm font-bold text-[#092052] bg-[#f3f7ff] border border-[#092052]/20 px-2.5 py-1 rounded-md">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                  <span className="rounded-lg border border-[#092052]/20 bg-[#f3f7ff] px-2.5 py-1 font-mono text-sm font-bold text-[#092052]">
                     {row.NumeroOP}
                   </span>
-                  <span className="font-mono text-xs text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
+                  <span className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-xs text-slate-500">
                     {row.SKU}
                   </span>
-                  <span className="text-sm sm:text-base font-semibold text-slate-900 truncate">
-                    {row.NombreProducto}
-                  </span>
                 </div>
+                <ClasificacionBadge value={row.ClasificacionInventario} />
+              </div>
 
-                {/* Fila 2: Empresa + Almacén + Clasificación */}
-                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+              <div className="space-y-3">
+                <h3 className="text-base font-bold leading-6 text-slate-900 sm:text-lg break-words">
+                  {row.NombreProducto}
+                </h3>
+
+                <div className="grid gap-3 sm:grid-cols-2">
                   {row.NombreEmpresa && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 border border-slate-200 px-2 py-1">
-                      <span className="text-slate-400">🏢</span>
-                      {row.NombreEmpresa}
-                    </span>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Empresa</div>
+                      <div className="mt-1 flex items-center gap-2 font-medium text-slate-800">
+                        <span>🏢</span>
+                        <span className="break-words">{row.NombreEmpresa}</span>
+                      </div>
+                    </div>
                   )}
-                  <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 border border-slate-200 px-2 py-1">
-                    <span className="text-slate-400">📍</span>
-                    {row.AlmacenSugerido
-                      ? <span className="text-emerald-700 font-semibold">{row.AlmacenSugerido}</span>
-                      : <span className="text-red-500 italic">Sin almacén configurado</span>
-                    }
-                  </span>
-                  <ClasificacionBadge value={row.ClasificacionInventario} />
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Almacén destino</div>
+                    <div className="mt-1 flex items-center gap-2 font-medium">
+                      <span>📍</span>
+                      {row.AlmacenSugerido ? (
+                        <span className="break-words text-emerald-700">{row.AlmacenSugerido}</span>
+                      ) : (
+                        <span className="italic text-red-500">Sin almacén configurado</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                {/* Fila 3: Cant. producida + Fecha cierre */}
-                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-                  <span>
-                    <span className="font-medium text-slate-700">Cant. producida: </span>
-                    <span className="font-bold text-slate-900">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Cantidad producida</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900">
                       {Number(row.CantidadProducida || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                    </span>
-                  </span>
-                  {row.FechaCierre && (
-                    <span>
-                      <span className="font-medium text-slate-700">Cerrada: </span>
-                      {new Date(row.FechaCierre).toLocaleString('es-MX', {
-                        year: 'numeric', month: '2-digit', day: '2-digit',
-                        hour: '2-digit', minute: '2-digit', hour12: false,
-                      })}
-                    </span>
-                  )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Fecha de cierre</div>
+                    <div className="mt-1 text-sm font-medium text-slate-700">
+                      {row.FechaCierre
+                        ? new Date(row.FechaCierre).toLocaleString('es-MX', {
+                            year: 'numeric', month: '2-digit', day: '2-digit',
+                            hour: '2-digit', minute: '2-digit', hour12: false,
+                          })
+                        : 'Sin fecha registrada'}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Botón acción */}
-              <div className="shrink-0">
+              <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm text-slate-500">
+                  Revisa la información de la OP y registra la entrada cuando el producto esté listo.
+                </div>
                 <button
                   onClick={() => openModal(row)}
-                  className="w-full sm:w-auto px-5 py-2.5 bg-[#f59e0b] hover:bg-[#d98707] text-white rounded-lg text-sm font-semibold shadow-sm transition-colors"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#f59e0b] px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#d98707] sm:w-auto"
                 >
-                  <span className="inline-flex items-center gap-2">
-                    <span>📦</span>
-                    <span>Recepcionar</span>
-                  </span>
+                  <span>📦</span>
+                  <span>Recepcionar</span>
                 </button>
               </div>
             </div>
           ))}
-        </div>
+        </section>
       )}
 
       {/* ── Modal recepción manual ── */}
       {modalRow && (
         <div className="fixed inset-0 z-50 bg-slate-900/55 backdrop-blur-[1px] flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 border border-slate-200">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">Registrar entrada a almacén</h3>
-              <button onClick={() => setModalRow(null)} className="text-slate-400 hover:text-slate-700 text-2xl leading-none">×</button>
+          <div className="w-full max-w-md overflow-hidden rounded-[26px] shadow-2xl">
+            <div className="flex items-center justify-between bg-gradient-to-r from-[#1b3d86] to-[#2a5fc4] px-6 py-4">
+              <h3 className="text-base font-bold text-white">Registrar entrada a almacén</h3>
+              <button onClick={() => setModalRow(null)} className="text-white/70 hover:text-white text-2xl leading-none">&times;</button>
             </div>
+            <div className="bg-white p-6">
 
             <div className="bg-slate-50 rounded-lg p-3 mb-4 text-sm space-y-1 border border-slate-200">
               <div className="flex justify-between">
@@ -367,9 +420,11 @@ export default function RecepcionPendiente() {
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

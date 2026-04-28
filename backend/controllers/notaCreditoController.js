@@ -98,6 +98,7 @@ exports.crearNotaCredito = async (req, res) => {
 exports.timbrarNotaCredito = async (req, res) => {
   try {
     const { id } = req.params;
+    const { PaymentForm: bodyPaymentForm, PaymentMethod: bodyPaymentMethod } = req.body || {};
     
     const pool = await poolPromise;
     
@@ -106,10 +107,13 @@ exports.timbrarNotaCredito = async (req, res) => {
       .input('NotaCredito_Id', sql.Int, id)
       .query(`
         SELECT nc.*, f.UUID as FacturaUUID, f.ReceptorRFC, f.ReceptorNombre,
-               c.RFC as EmisorRFC, c.LegalName as EmisorNombre, c.FiscalRegime, c.TaxZipCode
+               c.RFC as EmisorRFC, c.LegalName as EmisorNombre,
+               cl.TaxRegime as ReceptorFiscalRegime, addr.PostalCode as ReceptorTaxZipCode, cl.Client_Id as ReceptorClientId
         FROM ERP_NOTAS_CREDITO nc
         INNER JOIN ERP_FACTURAS f ON nc.Factura_Id = f.Factura_Id
         INNER JOIN ERP_COMPANY c ON nc.Company_Id = c.Company_Id
+        LEFT JOIN ERP_CLIENT cl ON f.ReceptorRFC = cl.RFC
+        LEFT JOIN ERP_CLIENTADRESSES addr ON cl.Client_Id = addr.Client_Id AND addr.IsPrimary = 1
         WHERE nc.NotaCredito_Id = @NotaCredito_Id
       `);
     
@@ -125,43 +129,100 @@ exports.timbrarNotaCredito = async (req, res) => {
       .query('SELECT * FROM ERP_NOTA_CREDITO_DETALLE WHERE NotaCredito_Id = @NotaCredito_Id');
     
     // Preparar CFDI de Egreso para Facturama
+    // Asegurar Folio, PaymentMethod/Forma y que Relations sea un objeto (no arreglo).
+    const folio = nota.Folio || String(Date.now()).slice(-8);
+
+    // Obtener datos del emisor desde la tabla ERP_COMPANY vía el servicio (evita depender de columnas que pueden no existir en la BD)
+    let emisor = {};
+    try {
+      emisor = await facturamaService.getEmisorData(nota.Company_Id);
+    } catch (err) {
+      console.warn('[NotaCredito] No se pudieron obtener datos del emisor desde BD:', err?.message || err);
+      // Emisor base desde la consulta (solo RFC/Nombre) si no hay datos adicionales
+      emisor = {
+        Rfc: nota.EmisorRFC,
+        Name: nota.EmisorNombre,
+        FiscalRegime: null,
+        TaxZipCode: null
+      };
+    }
+
+    // Tomar régimen fiscal del receptor si está disponible (se añadió a la consulta)
+    let receptorFiscal = nota.ReceptorFiscalRegime || nota.ReceptorFiscalRegimen || null;
+    // Normalizar a código de 3 dígitos si es posible
+    const normalizeFiscalCode = (val) => {
+      if (!val && val !== 0) return null;
+      const s = String(val).trim();
+      if (/^\d{3}$/.test(s)) return s;
+      const m = s.match(/\b(\d{3})\b/);
+      return m ? m[1] : null;
+    };
+
+    receptorFiscal = normalizeFiscalCode(receptorFiscal);
+
+    // RFC de receptor: 12 = persona moral, 13 = persona física
+    const receptorRfc = String(nota.ReceptorRFC || '').trim();
+
+    // Si no existe régimen fiscal para el receptor, devolver error claro para que lo configuren en ERP_CLIENT
+    if (!receptorFiscal) {
+      console.error('[NotaCredito] Receptor sin TaxRegime configurado. RFC=', receptorRfc);
+      return res.status(400).json({
+        success: false,
+        message: 'El receptor no tiene régimen fiscal configurado. Actualice el campo TaxRegime en ERP_CLIENT para este cliente antes de timbrar.',
+        receptor: { Rfc: receptorRfc, Name: nota.ReceptorNombre }
+      });
+    }
+
+    // Evitar correcciones automáticas peligrosas (no forzar 616->612). Si Facturama rechaza, el usuario debe revisar el TaxRegime.
+
     const cfdiData = {
+      Folio: folio,
       CfdiType: 'E',
       NameId: '1',
-      ExpeditionPlace: nota.TaxZipCode || '64000',
+      ExpeditionPlace: emisor.TaxZipCode || nota.ReceptorTaxZipCode || '64000',
       Issuer: {
-        FiscalRegime: nota.FiscalRegime || '601',
-        Rfc: nota.EmisorRFC,
-        Name: nota.EmisorNombre
+        FiscalRegime: emisor.FiscalRegime || '601',
+        Rfc: emisor.Rfc || nota.EmisorRFC,
+        Name: emisor.Name || nota.EmisorNombre
       },
       Receiver: {
-        Rfc: nota.ReceptorRFC,
+        Rfc: receptorRfc,
         Name: nota.ReceptorNombre,
-        CfdiUse: 'G02',
-        FiscalRegime: '616',
-        TaxZipCode: '64000'
+        CfdiUse: nota.ReceptorUsoCfdi || 'G03',
+        FiscalRegime: receptorFiscal || '612',
+        TaxZipCode: nota.ReceptorTaxZipCode || '64000'
       },
-      Items: detalleResult.recordset.map(item => ({
-        ProductCode: '01010101',
-        UnitCode: 'E48',
-        Unit: 'Pieza',
-        Description: item.Descripcion,
-        Quantity: item.Cantidad,
-        UnitPrice: item.PrecioUnitario,
-        Subtotal: item.Subtotal,
-        Taxes: [{
-          Name: 'IVA',
-          Rate: 0.16,
-          Base: item.Subtotal,
-          Total: item.IVA,
-          IsRetention: false,
-          Type: 'Federal'
-        }]
-      })),
-      Relations: [{
+      PaymentForm: bodyPaymentForm || nota.FormaPago || '01',
+      PaymentMethod: bodyPaymentMethod || nota.MetodoPago || 'PUE',
+      Items: detalleResult.recordset.map(item => {
+        const subtotal = Number(item.Subtotal || 0);
+        const ivaAmount = Number(item.IVA || 0);
+        const totalItem = parseFloat((subtotal + ivaAmount).toFixed(2));
+
+        return {
+          ProductCode: '01010101',
+          UnitCode: 'E48',
+          Unit: 'Pieza',
+          Description: item.Descripcion,
+          Quantity: Number(item.Cantidad || 0),
+          UnitPrice: Number(item.PrecioUnitario || 0),
+          Subtotal: subtotal,
+          TaxObject: '02',
+          Total: totalItem,
+          Taxes: [{
+            Name: 'IVA',
+            Rate: 0.16,
+            Base: subtotal,
+            Total: ivaAmount,
+            IsRetention: false,
+            Type: 'Federal'
+          }]
+        };
+      }),
+      Relations: {
         Type: '01',
-        Cfdis: [nota.FacturaUUID]
-      }]
+        Cfdis: [{ Uuid: nota.FacturaUUID }]
+      }
     };
     
     // Timbrar en Facturama (API Multiemisor)
@@ -188,10 +249,21 @@ exports.timbrarNotaCredito = async (req, res) => {
     });
   } catch (error) {
     console.error('Error al timbrar nota de crédito:', error);
+    // Si Facturama devolvió ModelState indicando mismatch de nombre del emisor, devolver mensaje claro
+    const factErr = error.response?.data || error;
+    if (factErr && factErr.ModelState && (factErr.ModelState['cfdiToCreate.Issuer.Rfc'] || factErr.ModelState['Issuer.Rfc'])) {
+      const details = factErr.ModelState['cfdiToCreate.Issuer.Rfc'] || factErr.ModelState['Issuer.Rfc'];
+      return res.status(400).json({
+        success: false,
+        message: 'Facturama rechazó el timbrado por incompatibilidad entre el RFC y el nombre del emisor. Actualice el campo "Razón Social" de la empresa para que coincida exactamente con el nombre asociado al RFC en Facturama (o vuelva a subir el CSD).',
+        facturama: { Message: factErr.Message || null, ModelState: factErr.ModelState, details }
+      });
+    }
+
     res.status(500).json({ 
       success: false, 
-      message: error.response?.data?.Message || 'Error al timbrar nota de crédito',
-      error: error.response?.data || error.message 
+      message: factErr?.Message || 'Error al timbrar nota de crédito',
+      error: factErr || error.message 
     });
   }
 };
@@ -267,6 +339,36 @@ exports.getNotaCreditoDetalle = async (req, res) => {
   } catch (error) {
     console.error('Error al obtener nota de crédito:', error);
     res.status(500).json({ success: false, message: 'Error al obtener nota de crédito', error: error.message });
+  }
+};
+
+// Descargar PDF de nota de crédito (stream desde Facturama)
+exports.descargarPdf = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = await poolPromise;
+
+    const notaResult = await pool.request()
+      .input('NotaCredito_Id', sql.Int, id)
+      .query('SELECT NotaCredito_Id, UUID, FacturamaId, Company_Id FROM ERP_NOTAS_CREDITO WHERE NotaCredito_Id = @NotaCredito_Id');
+
+    if (!notaResult.recordset.length) return res.status(404).json({ success: false, message: 'Nota de crédito no encontrada' });
+
+    const nota = notaResult.recordset[0];
+    const cfdiId = nota.FacturamaId || nota.UUID;
+    if (!cfdiId) return res.status(400).json({ success: false, message: 'La nota de crédito no está timbrada aún' });
+
+    // Obtener PDF desde Facturama
+    const pdfBuffer = await require('../services/facturamaService').descargarPDF(cfdiId);
+
+    // Responder con PDF
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="nota_credito_${nota.NotaCredito_Id}.pdf"`);
+    return res.send(Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer));
+  } catch (error) {
+    console.error('[NotaCredito] Error descargando PDF:', error.response?.data || error.message || error);
+    const status = error?.response?.status || 500;
+    return res.status(500).json({ success: false, message: 'Error descargando PDF', error: error.response?.data || error.message || error });
   }
 };
 

@@ -1,0 +1,52 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip show *)",
+      "PowerShell(sqlcmd -S 74.208.195.73,1433 -U sa -P \"D1g1t4l3dg32024.\" -Q \"SELECT name FROM sys.databases WHERE name IN \\('ERP','ERP_Zoro'\\)\" 2>&1)",
+      "Read(//c/Program Files/Microsoft SQL Server/**)",
+      "Read(//c/Program Files/**)",
+      "Bash(python -c ' *)",
+      "Bash(pip install *)",
+      "Bash(python -c \"import pyodbc; print\\([d for d in pyodbc.drivers\\(\\) if 'SQL' in d]\\)\")",
+      "Bash(python -c \"from app.main import app; print\\('Import OK'\\)\")",
+      "Bash(awk '{print $NF}')",
+      "Bash(python -c \"from app.main import app; print\\('OK'\\)\")",
+      "Read(//c/Users/diazj/.claude/projects/c--Users-diazj-OneDrive-Escritorio-ERP-PROYECTO/memory/**)",
+      "Read(//c/Users/diazj/OneDrive/Escritorio/1 a 1 v2/1 a 1 v2/**)",
+      "Bash(grep -E \"\\\\.\\(jsx|js\\)$\")",
+      "Bash(docker --version)",
+      "Bash(docker run *)",
+      "Bash(docker exec *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"http://localhost:8000/api/productos\" -H \"Authorization: Bearer test\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"http://localhost:8000/api/productos/\" -H \"Authorization: Bearer test\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X POST \"http://localhost:8000/api/auth/login/\" -H \"Content-Type: application/json\" -d '{\"username\":\"x\",\"password\":\"x\"}')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X POST \"http://localhost:8000/api/auth/login\" -H \"Content-Type: application/json\" -d '{\"username\":\"x\",\"password\":\"x\"}')",
+      "Bash(grep -oE \"api\\\\.\\(get|post|put|patch|delete\\)\\\\\\('[^']*'|api\\\\.\\(get|post|put|patch|delete\\)\\\\\\(\\\\`[^\\\\`]*\\\\`\")",
+      "Bash(xargs grep *)",
+      "Read(//c/Users/diazj/OneDriveEscritorio/ERP_PROYECTO/**)",
+      "Bash(xargs -I {} basename {})",
+      "Bash(sed 's/CREATE TABLE \\\\[dbo\\\\]\\\\.\\\\[//')",
+      "Bash(sed 's/\\\\]//')",
+      "Bash(sed 's/\\\\].*//')",
+      "Bash(grep -E \"\\\\.\\(py|pyx\\)$\")",
+      "Bash(awk '{print $9, $5}')",
+      "Bash(cat src/services/api.js)",
+      "Bash(cat src/services/api.ts)",
+      "Bash(sqlcmd -?)",
+      "Bash(python -c \"import pyodbc; print\\('pyodbc ok'\\)\")",
+      "Bash(python -)",
+      "Bash(python -m uvicorn app.main:app --reload --port 8000)",
+      "Bash(python -c \"from app.api import router\")",
+      "Bash(findstr \":8000\")",
+      "Bash(sed \"s/.*VALUES \\(//\")",
+      "Bash(sed \"s/\\).*//\")",
+      "Bash(npm run *)",
+      "Bash(node -e \"const fs=require\\('fs'\\); const buf=fs.readFileSync\\('src/layouts/DashboardLayout.jsx'\\); const str=buf.toString\\('utf8'\\); const idx=str.indexOf\\('rdenes'\\); console.log\\('Context:', JSON.stringify\\(str.slice\\(idx-3,idx+12\\)\\)\\); const idx2=str.indexOf\\('roducci'\\); console.log\\('Context2:', JSON.stringify\\(str.slice\\(idx2-3,idx2+15\\)\\)\\);\")",
+      "Bash(node -e ' *)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\diazj\\.claude\\projects\\c--Users-diazj-OneDrive-Escritorio-ERP-PROYECTO\\memory",
+      "c:\\Users\\diazj\\.claude\\plans"
+    ]
+  }
+}

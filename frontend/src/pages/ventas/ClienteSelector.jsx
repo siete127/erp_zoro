@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import api from "../../services/api";
 
 const ClienteSelector = ({ onClienteSelect, clienteData = {} }) => {
   const [clientes, setClientes] = useState([]);
+  const selectedClientId = clienteData?.Client_Id || "";
 
   useEffect(() => {
     cargarClientes();
@@ -12,15 +11,12 @@ const ClienteSelector = ({ onClienteSelect, clienteData = {} }) => {
 
   const cargarClientes = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/clients`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/clients');
       if (response.data.success) {
         setClientes(response.data.data || []);
       }
-    } catch (error) {
-      console.error('Error al cargar clientes:', error);
+    } catch {
+      console.error('Error al cargar clientes');
       setClientes([]);
     }
   };
@@ -43,7 +39,11 @@ const ClienteSelector = ({ onClienteSelect, clienteData = {} }) => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Seleccionar Cliente</label>
-          <select onChange={handleClienteChange} className="w-full px-3 py-2 border border-gray-300 rounded text-sm">
+          <select
+            value={selectedClientId}
+            onChange={handleClienteChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+          >
             <option value="">-- Seleccione un cliente --</option>
             {clientes.map(cliente => (
               <option key={cliente.Client_Id} value={cliente.Client_Id}>

@@ -8,6 +8,8 @@
  */
 const fs = require('fs');
 const path = require('path');
+const pdfParse = require('pdf-parse');
+const XLSX = require('xlsx');
 const { pool, sql } = require('../config/db');
 const pdfService = require('../services/comprasPdfService');
 
@@ -28,6 +30,535 @@ async function getNextNumeroOC(companyId) {
   const seq = (r.recordset[0].Total || 0) + 1;
   return `OC-${String(companyId).padStart(3, '0')}-${String(seq).padStart(5, '0')}`;
 }
+
+function normalizeText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function parseNumericValue(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  let raw = String(value || '').trim();
+  if (!raw) return 0;
+
+  raw = raw.replace(/[^\d,.-]/g, '');
+  if (!raw) return 0;
+
+  const lastComma = raw.lastIndexOf(',');
+  const lastDot = raw.lastIndexOf('.');
+
+  if (lastComma > -1 && lastDot > -1) {
+    raw = lastComma > lastDot
+      ? raw.replace(/\./g, '').replace(',', '.')
+      : raw.replace(/,/g, '');
+  } else if (lastComma > -1) {
+    const commaCount = (raw.match(/,/g) || []).length;
+    raw = commaCount === 1 ? raw.replace(',', '.') : raw.replace(/,/g, '');
+  }
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function tokenize(value) {
+  return normalizeText(value)
+    .split(' ')
+    .map((token) => token.trim())
+    .filter((token) => token.length > 2);
+}
+
+const SHEET_FIELD_ALIASES = {
+  codigo: ['codigo', 'clave', 'sku', 'item', 'articulo', 'producto', 'material', 'codigoproveedor'],
+  descripcion: ['descripcion', 'concepto', 'producto descripcion', 'articulo descripcion', 'nombre', 'material descripcion', 'descripcion material'],
+  cantidad: ['cantidad', 'cant', 'qty', 'unidades', 'kgs', 'kg', 'cantidad facturada'],
+  precio: ['precio', 'precio unitario', 'costo', 'costo unitario', 'unit price', 'importe unitario', 'valor unitario'],
+  iva: ['iva', 'iva%', 'impuesto', 'tasa iva', 'porcentaje iva'],
+};
+
+function detectSheetFields(headerRow) {
+  const normalizedHeaders = headerRow.map((header) => normalizeText(header));
+  const mapping = {};
+
+  Object.entries(SHEET_FIELD_ALIASES).forEach(([field, aliases]) => {
+    const index = normalizedHeaders.findIndex((header) => aliases.includes(header));
+    if (index >= 0) mapping[field] = index;
+  });
+
+  return mapping;
+}
+
+function extractRowsFromSupplierSheet(fileBuffer) {
+  const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) return [];
+
+  const sheet = workbook.Sheets[firstSheetName];
+  const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', blankrows: false, raw: false });
+  if (!matrix.length) return [];
+
+  let bestHeaderIndex = 0;
+  let bestScore = -1;
+
+  matrix.slice(0, 10).forEach((row, index) => {
+    const mapping = detectSheetFields(row);
+    const score = Object.keys(mapping).length;
+    if (score > bestScore) {
+      bestScore = score;
+      bestHeaderIndex = index;
+    }
+  });
+
+  const headerRow = matrix[bestHeaderIndex] || [];
+  const mapping = detectSheetFields(headerRow);
+
+  return matrix
+    .slice(bestHeaderIndex + 1)
+    .map((row, index) => {
+      const codigo = mapping.codigo !== undefined ? row[mapping.codigo] : '';
+      const descripcion = mapping.descripcion !== undefined ? row[mapping.descripcion] : '';
+      const cantidad = mapping.cantidad !== undefined ? parseNumericValue(row[mapping.cantidad]) : 0;
+      const precio = mapping.precio !== undefined ? parseNumericValue(row[mapping.precio]) : 0;
+      const iva = mapping.iva !== undefined ? parseNumericValue(row[mapping.iva]) : DEFAULT_IVA_RATE;
+
+      return {
+        rowNumber: bestHeaderIndex + index + 2,
+        codigo: String(codigo || '').trim(),
+        descripcion: String(descripcion || '').trim(),
+        cantidad: cantidad || 0,
+        precio: precio || 0,
+        iva: iva || DEFAULT_IVA_RATE,
+      };
+    })
+    .filter((row) => row.codigo || row.descripcion || row.cantidad > 0 || row.precio > 0);
+}
+
+function isNumericToken(token) {
+  return /^[-$]?[\d.,]+%?$/.test(String(token || '').trim());
+}
+
+/* =============================================================
+   PDF PARSERS — SAT CFDI INVOICE FORMATS
+   FORMAT A — ADHEMPA (GAD...)      : single dense row
+   FORMAT B — QUIMICA UNIVALIX (QUN...): qty+zeros+code / desc / unit
+   FORMAT C — SMURFIT (SCP...)      : decimal-qty block + multi-line desc + price
+   FALLBACK  — generic heuristic
+============================================================= */
+
+const NOISE_PATTERNS = [
+  /subtotal/i,
+  /^total$/i,
+  /importe total/i,
+  /folio fiscal/i,
+  /fecha.*certif/i,
+  /metodo de pago/i,
+  /forma de pago/i,
+  /cadena original/i,
+  /sello digital/i,
+  /numero de serie/i,
+  /uso del cfdi/i,
+  /regimen fiscal/i,
+  /tipo comprobante/i,
+  /lugar de expedicion/i,
+  /^r\.f\.c\./i,
+  /^rfc:/i,
+  /domicilio fiscal/i,
+  /^serie:/i,
+  /^folio:/i,
+  /^fecha y hora/i,
+  /observaciones/i,
+  /favor de pagar/i,
+  /transferencia bancaria/i,
+  /^impuesto:/i,
+  /^descripci/i,
+  /^cantidadunidad/i,
+  /^clav[e]/i,
+  /^sat$/i,
+  /^unidad$/i,
+  /\|\|\|1\.1\|/,
+];
+
+function isNoiseLine(line) {
+  const n = normalizeText(line);
+  if (n.length < 2) return true;
+  // UUID line
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(line)) return true;
+  // long certificate serial
+  if (/^\d{17,}$/.test(n.replace(/\s/g, ''))) return true;
+  return NOISE_PATTERNS.some((re) => re.test(line));
+}
+
+/**
+ * FORMAT C — Smurfit Cartón y Papel de México (SCP900125TT8)
+ * Each item block:
+ *   Line 0: "<qty><SAT_unit_code><SAT_prod_code>TO"  e.g. "1.16414122100TO"
+ *   Lines 1-N: description parts                    e.g. "BOBINA LINER ENCOLADO SCPM"
+ *   Then: "$unit_price$total"                        e.g. "$10,500.00$12,222.00"
+ */
+function parseSmurfitBlocks(lines) {
+  // Block start: decimal number + 7+ digits + optional unit abbrev
+  const BLOCK_START = /^(\d+\.\d+)\d{7,}(?:TO|KG|LT|PZ|UN)?$/i;
+  // Price line: two dollar amounts fused e.g. "$10,500.00$12,222.00"
+  const PRICE_LINE  = /^\$([\d,]+\.\d{2})\$([\d,]+\.\d{2})$/;
+
+  const results = [];
+  let i = 0;
+  while (i < lines.length) {
+    const m = BLOCK_START.exec(lines[i]);
+    if (m) {
+      const qty = parseFloat(m[1]);
+      const descParts = [];
+      let precio = 0;
+      let j = i + 1;
+      while (j < lines.length && j < i + 10) {
+        const stripped = lines[j].replace(/\s/g, '');
+        const pm = PRICE_LINE.exec(stripped);
+        if (pm) {
+          precio = parseNumericValue(pm[1]); // unit price
+          j++;
+          break;
+        }
+        if (BLOCK_START.test(lines[j])) break;
+        if (!isNoiseLine(lines[j]) && lines[j].length > 2) {
+          descParts.push(lines[j].trim());
+        }
+        j++;
+      }
+      const descripcion = descParts.join(' ').trim();
+      if (descripcion && qty > 0) {
+        results.push({
+          rowNumber: i + 1,
+          codigo: '',
+          descripcion,
+          cantidad: qty,
+          precio,
+          iva: DEFAULT_IVA_RATE,
+        });
+      }
+      i = j;
+    } else {
+      i++;
+    }
+  }
+  return results;
+}
+
+/**
+ * FORMAT B — Quimica Univalix (QUN050509178)
+ * Each item:
+ *   Line 0: "<qty>000...<supplier_code>"  e.g. "100.00005089-2511-360"
+ *   Line 1: "<prod_code><desc>0.00<unit_price><importe>"  e.g. "UNIVM 50890.0015.00001,500.00"
+ *   Line 2: unit abbreviation  e.g. "KG" or "5 CUB"
+ */
+function parseUnivalixBlocks(lines) {
+  // Line 0 pattern: number + 3+ zeros (padding) + alphanumeric code
+  const ROW_START = /^(\d+(?:\.\d+)?)0{3,}[\w-]+/;
+
+  const results = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (ROW_START.test(lines[i])) {
+      const qtyMatch = lines[i].match(/^(\d+(?:\.\d+)?)/);
+      const qty = qtyMatch ? parseFloat(qtyMatch[1]) : 0;
+
+      // Supplier code at end of line after zero-padding
+      const codeMatch = lines[i].match(/0{3,}([\w-]+)$/);
+      const codigoProveedor = codeMatch ? codeMatch[1] : '';
+
+      const descLine = (lines[i + 1] || '').trim();
+      if (descLine) {
+        // Split on whitespace, isolate trailing numeric tokens
+        const parts = descLine.split(/\s+/);
+        let descEnd = parts.length;
+        for (let k = parts.length - 1; k >= 1; k--) {
+          if (!isNumericToken(parts[k])) {
+            descEnd = k + 1;
+            break;
+          }
+        }
+        const descripcion = parts.slice(0, descEnd).join(' ').trim() || descLine;
+        const numericValues = parts
+          .slice(descEnd)
+          .map(parseNumericValue)
+          .filter((v) => v > 0);
+        // unit price = second-to-last number; importe = last
+        const precio = numericValues.length >= 2
+          ? numericValues[numericValues.length - 2]
+          : (numericValues[0] || 0);
+
+        results.push({
+          rowNumber: i + 1,
+          codigo: codigoProveedor,
+          descripcion,
+          cantidad: qty > 0 ? qty : 1,
+          precio,
+          iva: DEFAULT_IVA_RATE,
+        });
+      }
+      i += 3;
+    } else {
+      i++;
+    }
+  }
+  return results;
+}
+
+/**
+ * FORMAT A — Adhempa / GRUPO ADHEMPA (GAD0307043D4)
+ * Dense single line: "5,500PC 3020PC 30200.009.00000049,500.00KGMKG31201610"
+ * qty + alpha-num code + misc numbers + total_price + unit letters
+ */
+function parseAdhempaBlocks(lines) {
+  // Pattern: number (qty) + uppercase letters + digits (code) + ... + last price dd,ddd.dd + uppercase tail
+  const DENSE = /^([\d,]+(?:\.\d+)?)([A-Z]{1,5}\s*\d{1,5}(?:\s*[A-Z]{0,5}\s*\d{0,5})*)(.*?)([\d,]+\.\d{2})[A-Z]/;
+  const results = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const m = DENSE.exec(line);
+    if (m) {
+      const qty = parseNumericValue(m[1]);
+      const codigo = m[2].replace(/\s+/g, ' ').trim();
+      const totalPrice = parseNumericValue(m[4]);
+      if (qty > 0 && totalPrice > 0) {
+        results.push({
+          rowNumber: i + 1,
+          codigo,
+          descripcion: codigo,
+          cantidad: qty,
+          precio: Math.round((totalPrice / qty) * 100) / 100,
+          iva: DEFAULT_IVA_RATE,
+        });
+      }
+    }
+  }
+  return results;
+}
+
+/**
+ * GENERIC FALLBACK — simple line-by-line heuristic
+ */
+function parseGenericPdfLines(lines) {
+  const results = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (isNoiseLine(line)) continue;
+    const tokens = line.split(/\s+/);
+    const nums = tokens
+      .filter(isNumericToken)
+      .map(parseNumericValue)
+      .filter((v) => v > 0 && v < 1e9);
+    const textTokens = tokens.filter(
+      (t) => !isNumericToken(t) && t.length > 2 && /[a-zA-Z]/.test(t),
+    );
+    if (nums.length < 1 || textTokens.length < 1) continue;
+    if (nums.length === 1 && nums[0] > 10000) continue;
+    const qty = nums[0];
+    const precio = nums.length >= 2 ? nums[nums.length - 1] : 0;
+    const descripcion = textTokens.join(' ').trim();
+    const codeCandidate = tokens[0];
+    const codigo = /^[A-Z0-9][\w-]{1,20}$/.test(codeCandidate) ? codeCandidate : '';
+    if (descripcion) {
+      results.push({
+        rowNumber: i + 1,
+        codigo,
+        descripcion,
+        cantidad: qty > 0 ? qty : 1,
+        precio,
+        iva: DEFAULT_IVA_RATE,
+      });
+    }
+  }
+  return results;
+}
+
+/**
+ * Master PDF extractor: detects format and routes to the right parser.
+ */
+async function extractRowsFromSupplierPdf(fileBuffer) {
+  const pdfData = await pdfParse(fileBuffer);
+  const lines = String(pdfData.text || '')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  // FORMAT C signature: lines like "1.16414122100TO" (decimal + 7+ digits + TO/KG)
+  const smurfitSig = lines.filter((l) => /^\d+\.\d+\d{7,}(?:TO|KG|LT|PZ|UN)?$/i.test(l));
+  if (smurfitSig.length >= 2) {
+    const rows = parseSmurfitBlocks(lines);
+    if (rows.length > 0) return rows;
+  }
+
+  // FORMAT B signature: lines like "100.00005089-2511-360"
+  const univalixSig = lines.filter((l) => /^\d+(?:\.\d+)?0{3,}[\w-]/.test(l));
+  if (univalixSig.length >= 1) {
+    const rows = parseUnivalixBlocks(lines);
+    if (rows.length > 0) return rows;
+  }
+
+  // FORMAT A signature: line starting with digits+commas then uppercase letter
+  const adhempaSig = lines.filter((l) => /^[\d,]+[A-Z]/.test(l) && l.length > 20);
+  if (adhempaSig.length >= 1) {
+    const rows = parseAdhempaBlocks(lines);
+    if (rows.length > 0) return rows;
+  }
+
+  // GENERIC FALLBACK
+  return parseGenericPdfLines(lines);
+}
+
+
+async function extractRowsFromSupplierDocument(fileBuffer, extension) {
+  if (extension === '.pdf') {
+    return extractRowsFromSupplierPdf(fileBuffer);
+  }
+
+  return extractRowsFromSupplierSheet(fileBuffer);
+}
+
+function buildMateriaPrimaIndex(rows) {
+  return rows.map((row) => ({
+    ...row,
+    codigoNorm: normalizeText(row.Codigo),
+    nombreNorm: normalizeText(row.Nombre),
+    descripcionNorm: normalizeText(row.Descripcion),
+    tokens: Array.from(new Set([
+      ...tokenize(row.Codigo),
+      ...tokenize(row.Nombre),
+      ...tokenize(row.Descripcion),
+    ])),
+  }));
+}
+
+function findBestMateriaPrimaMatch(sourceRow, materiaPrimaIndex) {
+  const codigoNorm = normalizeText(sourceRow.codigo);
+  const descripcionNorm = normalizeText(sourceRow.descripcion);
+  const sourceTokens = Array.from(new Set([
+    ...tokenize(sourceRow.codigo),
+    ...tokenize(sourceRow.descripcion),
+  ]));
+
+  let best = null;
+
+  for (const materiaPrima of materiaPrimaIndex) {
+    let score = 0;
+
+    if (codigoNorm && materiaPrima.codigoNorm === codigoNorm) score += 120;
+    if (codigoNorm && materiaPrima.codigoNorm && (materiaPrima.codigoNorm.includes(codigoNorm) || codigoNorm.includes(materiaPrima.codigoNorm))) score += 45;
+    if (descripcionNorm && materiaPrima.nombreNorm === descripcionNorm) score += 100;
+    if (descripcionNorm && materiaPrima.descripcionNorm === descripcionNorm) score += 85;
+    if (descripcionNorm && materiaPrima.nombreNorm && (descripcionNorm.includes(materiaPrima.nombreNorm) || materiaPrima.nombreNorm.includes(descripcionNorm))) score += 55;
+    if (descripcionNorm && materiaPrima.descripcionNorm && (descripcionNorm.includes(materiaPrima.descripcionNorm) || materiaPrima.descripcionNorm.includes(descripcionNorm))) score += 40;
+
+    const tokenMatches = sourceTokens.filter((token) => materiaPrima.tokens.includes(token)).length;
+    score += tokenMatches * 12;
+
+    if (!best || score > best.score) {
+      best = { materiaPrima, score };
+    }
+  }
+
+  if (!best || best.score < 36) return null;
+
+  return {
+    ...best.materiaPrima,
+    confidence: Math.min(100, Math.round((best.score / 120) * 100)),
+  };
+}
+
+/* ─────────────────────────────────────────────────────
+   10.1 ANALIZAR HOJA DE PROVEEDOR PARA REGISTRO DIRECTO
+   POST /api/compras/registro-directo/analizar-hoja
+   form-data: hojaProveedor
+───────────────────────────────────────────────────── */
+exports.analizarHojaProveedorRegistroDirecto = async (req, res) => {
+  try {
+    await pool.connect();
+
+    if (!req.files || !req.files.hojaProveedor) {
+      return res.status(400).json({ success: false, message: 'Debe cargar el archivo en el campo hojaProveedor' });
+    }
+
+    const hojaProveedor = req.files.hojaProveedor;
+    const extension = path.extname(hojaProveedor.name || '').toLowerCase();
+    const allowedExtensions = ['.xlsx', '.xls', '.csv', '.pdf'];
+
+    if (!allowedExtensions.includes(extension)) {
+      return res.status(400).json({ success: false, message: 'Solo se permiten archivos Excel, CSV o PDF (.xlsx, .xls, .csv, .pdf)' });
+    }
+
+    const sourceRows = await extractRowsFromSupplierDocument(hojaProveedor.data, extension);
+    if (!sourceRows.length) {
+      return res.status(400).json({ success: false, message: 'No se detectaron renglones utilizables en el archivo del proveedor' });
+    }
+
+    const materiaPrimaResult = await pool.request().query(`
+      SELECT MateriaPrima_Id, Codigo, Nombre, Descripcion, CostoUnitario, Moneda
+      FROM ERP_MATERIA_PRIMA
+      WHERE ISNULL(Activo, 1) = 1
+      ORDER BY Nombre
+    `);
+
+    const materiaPrimaIndex = buildMateriaPrimaIndex(materiaPrimaResult.recordset || []);
+
+    const items = sourceRows.map((row) => {
+      const match = findBestMateriaPrimaMatch(row, materiaPrimaIndex);
+      const precioCompra = row.precio > 0 ? row.precio : Number(match?.CostoUnitario || 0);
+
+      if (match) {
+        return {
+          Tipo: 'mp',
+          MateriaPrima_Id: match.MateriaPrima_Id,
+          Producto_Id: '',
+          Descripcion: match.Nombre || row.descripcion || row.codigo,
+          Cantidad: row.cantidad > 0 ? row.cantidad : 1,
+          PrecioCompra: precioCompra,
+          IVA: row.iva || DEFAULT_IVA_RATE,
+          ReferenciaProveedor: row.codigo || '',
+          DescripcionProveedor: row.descripcion || '',
+          MatchNombre: match.Nombre,
+          MatchCodigo: match.Codigo,
+          MatchConfidence: match.confidence,
+          RowNumber: row.rowNumber,
+        };
+      }
+
+      return {
+        Tipo: 'otro',
+        MateriaPrima_Id: '',
+        Producto_Id: '',
+        Descripcion: row.descripcion || row.codigo || `Renglón ${row.rowNumber}`,
+        Cantidad: row.cantidad > 0 ? row.cantidad : 1,
+        PrecioCompra: precioCompra,
+        IVA: row.iva || DEFAULT_IVA_RATE,
+        ReferenciaProveedor: row.codigo || '',
+        DescripcionProveedor: row.descripcion || '',
+        MatchConfidence: 0,
+        RowNumber: row.rowNumber,
+      };
+    });
+
+    const materiasLigadas = items.filter((item) => item.Tipo === 'mp').length;
+
+    return res.json({
+      success: true,
+      data: {
+        items,
+        resumen: {
+          archivo: hojaProveedor.name,
+          lineasDetectadas: items.length,
+          materiasLigadas,
+          lineasPendientes: items.length - materiasLigadas,
+        },
+      },
+    });
+  } catch (err) {
+    console.error('compras.analizarHojaProveedorRegistroDirecto', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 /* ─────────────────────────────────────────────────────
    1. LISTAR ÓRDENES DE COMPRA

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { crmService } from "../../services/crmService";
+import api from "../../services/api";
 import { notify } from "../../services/notify";
 import confirm from "../../services/confirm";
 import ModalSolicitarProductos from "../../components/ModalSolicitarProductos";
@@ -21,6 +22,21 @@ function OportunidadDetalle() {
     FechaProgramada: "",
   });
   const [modalProductosOpen, setModalProductosOpen] = useState(false);
+  const [historialCompras, setHistorialCompras] = useState([]);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
+
+  const handleCrearCotizacion = () => {
+    if (!oportunidad) return;
+    const params = new URLSearchParams();
+    params.set("oportunidad_id", oportunidad.Oportunidad_Id);
+    if (oportunidad.Client_Id) {
+      params.set("client_id", oportunidad.Client_Id);
+    }
+    if (oportunidad.Company_Id) {
+      params.set("company_id", oportunidad.Company_Id);
+    }
+    navigate(`/cotizaciones/nueva?${params.toString()}`);
+  };
 
   const cargarEtapas = async () => {
     try {
@@ -38,8 +54,21 @@ function OportunidadDetalle() {
     try {
       const res = await crmService.getOportunidad(id);
       const data = res?.data || res;
-      setOportunidad(data.oportunidad || data.Oportunidad || data);
+      const op = data.oportunidad || data.Oportunidad || data;
+      setOportunidad(op);
       setActividades(data.actividades || data.Actividades || []);
+
+      if (op?.Client_Id) {
+        setLoadingHistorial(true);
+        try {
+          const histRes = await api.get(`/crm/clientes/${op.Client_Id}/historial-compras`);
+          setHistorialCompras(histRes.data?.data || []);
+        } catch {
+          setHistorialCompras([]);
+        } finally {
+          setLoadingHistorial(false);
+        }
+      }
     } catch (error) {
       console.error("Error al obtener oportunidad", error);
       notify(error.response?.data?.message || "Error al obtener oportunidad", "error");
@@ -226,6 +255,17 @@ function OportunidadDetalle() {
                   <p>
                     <span className="text-gray-600">Status:</span> {oportunidad.Status || "Abierta"}
                   </p>
+                  {oportunidad.ID_COTIZACION && (
+                    <p className="mt-1">
+                      <span className="text-gray-600">Cotización:</span>{" "}
+                      <button
+                        className="text-blue-700 underline text-xs"
+                        onClick={() => navigate(`/cotizaciones/${oportunidad.ID_COTIZACION}`)}
+                      >
+                        Ver cotización #{oportunidad.ID_COTIZACION}
+                      </button>
+                    </p>
+                  )}
                   {oportunidad.Venta_Id && (
                     <p className="mt-1">
                       <span className="text-gray-600">Venta generada:</span>{" "}
@@ -241,6 +281,23 @@ function OportunidadDetalle() {
 
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex flex-col gap-2">
                   <h3 className="font-semibold text-gray-900 mb-2">Acciones</h3>
+                  {oportunidad.ID_COTIZACION ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/cotizaciones/${oportunidad.ID_COTIZACION}`)}
+                      className="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
+                    >
+                      Ver cotización vinculada
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleCrearCotizacion}
+                      className="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
+                    >
+                      Crear cotización
+                    </button>
+                  )}
                   <button
                     disabled={closing}
                     onClick={() => handleCerrar("Ganada")}
@@ -404,6 +461,60 @@ function OportunidadDetalle() {
                 </div>
               </div>
             </>
+          )}
+
+          {/* Historial de compras del cliente */}
+          {!loading && oportunidad && (
+            <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h3 className="font-semibold text-gray-900 mb-3 text-sm">Historial de compras del cliente</h3>
+              {loadingHistorial ? (
+                <p className="text-sm text-gray-500">Cargando...</p>
+              ) : historialCompras.length === 0 ? (
+                <p className="text-sm text-gray-500">Sin ventas previas para este cliente.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100 text-gray-600">
+                        <th className="text-left py-2 px-3 font-semibold">Venta #</th>
+                        <th className="text-left py-2 px-3 font-semibold">Fecha</th>
+                        <th className="text-right py-2 px-3 font-semibold">Total</th>
+                        <th className="text-left py-2 px-3 font-semibold">Productos</th>
+                        <th className="text-left py-2 px-3 font-semibold">Empresa</th>
+                        <th className="text-left py-2 px-3 font-semibold">Estatus</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historialCompras.map(v => (
+                        <tr key={v.Venta_Id} className="border-t border-gray-200">
+                          <td className="py-2 px-3 text-gray-800 font-medium">#{v.Venta_Id}</td>
+                          <td className="py-2 px-3 text-gray-700">{v.FechaVenta ? new Date(v.FechaVenta).toLocaleDateString('es-MX') : '—'}</td>
+                          <td className="py-2 px-3 text-right text-gray-800 font-semibold">${Number(v.Total || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+                          <td className="py-2 px-3 text-gray-700">{v.TotalProductos}</td>
+                          <td className="py-2 px-3 text-gray-700">{v.NameCompany}</td>
+                          <td className="py-2 px-3">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              v.Status_Id === 3 ? 'bg-green-100 text-green-800' :
+                              v.Status_Id === 4 ? 'bg-red-100 text-red-800' :
+                              'bg-amber-100 text-amber-800'
+                            }`}>{v.StatusNombre}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-gray-100 font-semibold text-xs">
+                        <td className="py-2 px-3 text-gray-700" colSpan={2}>Total acumulado</td>
+                        <td className="py-2 px-3 text-right text-gray-900">
+                          ${historialCompras.reduce((s, v) => s + Number(v.Total || 0), 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td colSpan={3}></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
           )}
 
           {!loading && !oportunidad && (

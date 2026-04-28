@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/auth/Login";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
@@ -35,10 +35,52 @@ import Reporteria from "./pages/Reporteria";
 import NotasCredito from "./pages/NotasCredito";
 import ComplementosPago from "./pages/ComplementosPago";
 import RH from "./pages/rh/RH";
+import Accounting from "./pages/accounting/Accounting";
+import Auditoria from "./pages/admin/Auditoria";
+import Licencias from "./pages/admin/Licencias";
 import OrdenesCompra from "./pages/compras/OrdenesCompra";
 import NuevaOrdenCompra from "./pages/compras/NuevaOrdenCompra";
 import DetalleOrdenCompra from "./pages/compras/DetalleOrdenCompra";
 import RegistroDirectoCompra from "./pages/compras/RegistroDirectoCompra";
+import Requisiciones from "./pages/compras/Requisiciones";
+import Proveedores from "./pages/compras/Proveedores";
+import Aprobaciones from "./pages/aprobaciones/Aprobaciones";
+import Leads from "./pages/crm/Leads";
+import EquiposVenta from "./pages/crm/EquiposVenta";
+import Tareas from "./pages/tareas/Tareas";
+import Proyectos from "./pages/proyectos/Proyectos";
+import DetalleProyecto from "./pages/proyectos/DetalleProyecto";
+import Nomina from "./pages/nomina/Nomina";
+import Asistencia from "./pages/asistencia/Asistencia";
+import GestionEmpresas from "./pages/superadmin/GestionEmpresas";
+import DashboardSuperAdmin from "./pages/superadmin/DashboardSuperAdmin";
+import PanelAdministradores from "./pages/superadmin/PanelAdministradores";
+import SolicitudPermisos from "./pages/superadmin/SolicitudPermisos";
+import ActivosFijos from "./pages/accounting/ActivosFijos";
+import Mantenimiento from "./pages/mantenimiento/Mantenimiento";
+import PortalCliente from "./pages/portal/PortalCliente";
+import Helpdesk from "./pages/helpdesk/Helpdesk";
+import DetalleTicket from "./pages/helpdesk/DetalleTicket";
+import Gastos from "./pages/expenses/Gastos";
+import CatalogoPublico from "./pages/website/CatalogoPublico";
+import ConfiguracionWebsite from "./pages/website/ConfiguracionWebsite";
+import Marketing from "./pages/marketing/Marketing";
+import Flotilla from "./pages/fleet/Flotilla";
+import Encuestas from "./pages/surveys/Encuestas";
+import DetalleEncuesta from "./pages/surveys/DetalleEncuesta";
+import EncuestaPublica from "./pages/surveys/EncuestaPublica";
+import Suscripciones from "./pages/subscriptions/Suscripciones";
+import SuperAdminLayout from "./pages/superadmin/SuperAdminLayout";
+import EmpresaLayoutSuperAdmin from "./pages/superadmin/EmpresaLayoutSuperAdmin";
+import DashboardEmpresa from "./pages/superadmin/empresa/DashboardEmpresa";
+import AdministradoresEmpresa from "./pages/superadmin/empresa/AdministradoresEmpresa";
+import UsuariosEmpresa from "./pages/superadmin/empresa/UsuariosEmpresa";
+import LicenciasEmpresa from "./pages/superadmin/empresa/LicenciasEmpresa";
+import AuditoriaEmpresa from "./pages/superadmin/empresa/AuditoriaEmpresa";
+import ModulosEmpresa from "./pages/superadmin/empresa/ModulosEmpresa";
+import VentasEmpresa from "./pages/superadmin/empresa/VentasEmpresa";
+import ComprasEmpresa from "./pages/superadmin/empresa/ComprasEmpresa";
+import FacturacionEmpresa from "./pages/superadmin/empresa/FacturacionEmpresa";
 import ProtectedLayout from "./layouts/ProtectedLayout";
 import Notification from './components/Notification';
 import ConfirmModal from './components/ConfirmModal';
@@ -50,6 +92,27 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/portal/:token" element={<PortalCliente />} />
+        <Route path="/website/:slug" element={<CatalogoPublico />} />
+        <Route path="/encuesta-publica/:encuestaId" element={<EncuestaPublica />} />
+        <Route element={<SuperAdminLayout />}>
+          <Route path="/superadmin/dashboard" element={<DashboardSuperAdmin />} />
+          <Route path="/superadmin/admins" element={<PanelAdministradores />} />
+          <Route path="/superadmin/permisos" element={<SolicitudPermisos />} />
+          <Route path="/superadmin/empresas" element={<GestionEmpresas />} />
+        </Route>
+        <Route path="/superadmin/empresas/:empresaId" element={<EmpresaLayoutSuperAdmin />}>
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<DashboardEmpresa />} />
+          <Route path="administradores" element={<AdministradoresEmpresa />} />
+          <Route path="usuarios" element={<UsuariosEmpresa />} />
+          <Route path="ventas" element={<VentasEmpresa />} />
+          <Route path="compras" element={<ComprasEmpresa />} />
+          <Route path="facturacion" element={<FacturacionEmpresa />} />
+          <Route path="licencias" element={<LicenciasEmpresa />} />
+          <Route path="auditoria" element={<AuditoriaEmpresa />} />
+          <Route path="modulos" element={<ModulosEmpresa />} />
+        </Route>
         <Route element={<ProtectedLayout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/create-user" element={<UserCreate />} />
@@ -73,6 +136,8 @@ function App() {
           <Route path="/cotizaciones/:id" element={<CotizacionDetalle />} />
           <Route path="/crm/oportunidades" element={<Oportunidades />} />
           <Route path="/crm/oportunidades/:id" element={<OportunidadDetalle />} />
+          <Route path="/crm/leads" element={<Leads />} />
+          <Route path="/crm/equipos" element={<EquiposVenta />} />
           <Route path="/produccion/ordenes" element={<OrdenesProduccion />} />
           <Route path="/produccion/ordenes/:id" element={<DetalleOrdenProduccion />} />
           <Route path="/produccion/bom" element={<GestionBOM />} />
@@ -87,10 +152,32 @@ function App() {
           <Route path="/notas-credito" element={<NotasCredito />} />
           <Route path="/complementos-pago" element={<ComplementosPago />} />
           <Route path="/rh" element={<RH />} />
-                  <Route path="/compras" element={<OrdenesCompra />} />
-                  <Route path="/compras/nueva" element={<NuevaOrdenCompra />} />
-                  <Route path="/compras/registro-directo" element={<RegistroDirectoCompra />} />
-                  <Route path="/compras/:id" element={<DetalleOrdenCompra />} />
+          <Route path="/contabilidad" element={<Accounting />} />
+          <Route path="/licencias" element={<Licencias />} />
+          <Route path="/auditoria" element={<Auditoria />} />
+          <Route path="/compras" element={<OrdenesCompra />} />
+          <Route path="/compras/nueva" element={<NuevaOrdenCompra />} />
+          <Route path="/compras/registro-directo" element={<RegistroDirectoCompra />} />
+          <Route path="/compras/requisiciones" element={<Requisiciones />} />
+          <Route path="/compras/proveedores" element={<Proveedores />} />
+          <Route path="/aprobaciones" element={<Aprobaciones />} />
+          <Route path="/compras/:id" element={<DetalleOrdenCompra />} />
+          <Route path="/tareas" element={<Tareas />} />
+          <Route path="/proyectos" element={<Proyectos />} />
+          <Route path="/proyectos/:id" element={<DetalleProyecto />} />
+          <Route path="/nomina" element={<Nomina />} />
+          <Route path="/asistencia" element={<Asistencia />} />
+          <Route path="/contabilidad/activos-fijos" element={<ActivosFijos />} />
+          <Route path="/mantenimiento" element={<Mantenimiento />} />
+          <Route path="/helpdesk" element={<Helpdesk />} />
+          <Route path="/helpdesk/:ticketId" element={<DetalleTicket />} />
+          <Route path="/gastos" element={<Gastos />} />
+          <Route path="/website" element={<ConfiguracionWebsite />} />
+          <Route path="/marketing" element={<Marketing />} />
+          <Route path="/flotilla" element={<Flotilla />} />
+          <Route path="/encuestas" element={<Encuestas />} />
+          <Route path="/encuestas/:encuestaId" element={<DetalleEncuesta />} />
+          <Route path="/suscripciones" element={<Suscripciones />} />
         </Route>
       </Routes>
       <Notification />

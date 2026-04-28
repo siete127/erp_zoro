@@ -1,11 +1,6 @@
-import axios from 'axios';
+import api from './api';
 
-const API_URL = '/api/reporteria';
-
-const getAuthHeader = () => {
-  const token = localStorage.getItem('token');
-  return { Authorization: `Bearer ${token}` };
-};
+const API_URL = '/reporteria';
 
 export const reporteriaService = {
   getFacturas: async (filtros = {}) => {
@@ -15,15 +10,12 @@ export const reporteriaService = {
     if (filtros.cliente) params.append('cliente', filtros.cliente);
     if (filtros.status) params.append('status', filtros.status);
     
-    const response = await axios.get(`${API_URL}/facturas?${params.toString()}`, {
-      headers: getAuthHeader()
-    });
+    const response = await api.get(`${API_URL}/facturas?${params.toString()}`);
     return response.data;
   },
 
   descargarPDF: async (facturaId) => {
-    const response = await axios.get(`${API_URL}/facturas/${facturaId}/pdf`, {
-      headers: getAuthHeader(),
+    const response = await api.get(`${API_URL}/facturas/${facturaId}/pdf`, {
       responseType: 'blob'
     });
     
@@ -37,8 +29,7 @@ export const reporteriaService = {
   },
 
   descargarXML: async (facturaId) => {
-    const response = await axios.get(`${API_URL}/facturas/${facturaId}/xml`, {
-      headers: getAuthHeader(),
+    const response = await api.get(`${API_URL}/facturas/${facturaId}/xml`, {
       responseType: 'blob'
     });
     
@@ -51,14 +42,17 @@ export const reporteriaService = {
     link.remove();
   },
 
+  cancelarFactura: async (facturaId, payload = {}) => {
+    const response = await api.post(`/facturas/${facturaId}/cancelar`, payload);
+    return response.data;
+  },
+
   getEstadisticas: async (filtros = {}) => {
     const params = new URLSearchParams();
     if (filtros.fechaInicio) params.append('fechaInicio', filtros.fechaInicio);
     if (filtros.fechaFin) params.append('fechaFin', filtros.fechaFin);
     
-    const response = await axios.get(`${API_URL}/estadisticas?${params.toString()}`, {
-      headers: getAuthHeader()
-    });
+    const response = await api.get(`${API_URL}/estadisticas?${params.toString()}`);
     return response.data;
   }
 };

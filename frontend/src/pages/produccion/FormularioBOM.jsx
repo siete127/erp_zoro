@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FaPlus, FaTrash, FaSave, FaArrowLeft } from 'react-icons/fa';
 import * as bomService from '../../services/bomService';
-import axios from 'axios';
+import api from '../../services/api';
 import { notify } from '../../services/notify';
 
 const PTC_REMA_LABEL = 'PTC REMA';
@@ -55,10 +55,7 @@ const FormularioBOM = () => {
 
   const resolverEmpresaPTCRema = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const headers = { Authorization: `Bearer ${token}` };
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-      const response = await axios.get(`${API_URL}/companies`, { headers });
+      const response = await api.get('/companies/');
       const empresas = response.data.data || response.data || [];
       const empresa = empresas.find((company) => {
         const name = String(company?.NameCompany || company?.CompanyName || company?.Nombre || '').toUpperCase();
@@ -79,19 +76,11 @@ const FormularioBOM = () => {
 
   const cargarDatos = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const headers = { Authorization: `Bearer ${token}` };
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
       if (!formData.Company_Id) {
         return;
       }
-      
-      // Cargar productos
-      const prodRes = await axios.get(`${API_URL}/productos`, { 
-        headers,
-        params: { company_id: formData.Company_Id }
-      });
+
+      const prodRes = await api.get('/productos', { params: { company_id: formData.Company_Id } });
       setProductos(prodRes.data.data || []);
       
       // Cargar materias primas

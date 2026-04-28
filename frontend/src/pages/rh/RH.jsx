@@ -16,7 +16,7 @@ const profileDefaults = {
   Ciudad: '',
   Estado: '',
   CodigoPostal: '',
-  Pais: 'México',
+  Pais: 'M\u00e9xico',
   NumeroEmpleado: '',
   FechaIngreso: '',
   Puesto: '',
@@ -66,23 +66,23 @@ const puestoOptions = createOptions([
   'Analista',
   'Coordinador',
   'Supervisor',
-  'Jefe de Área',
+  'Jefe de \u00c1rea',
   'Gerente',
   'Director',
   'Operador',
-  'Técnico',
+  'T\u00e9cnico',
   'Ejecutivo de Ventas',
   'Recursos Humanos',
   'Contador'
 ]);
 
 const departamentoOptions = createOptions([
-  'Administración',
+  'Administraci\u00f3n',
   'Ventas',
   'Compras',
-  'Producción',
-  'Almacén',
-  'Logística',
+  'Producci\u00f3n',
+  'Almac\u00e9n',
+  'Log\u00edstica',
   'Finanzas',
   'Recursos Humanos',
   'Calidad',
@@ -96,7 +96,7 @@ const tipoContratoOptions = createOptions([
   'Por obra determinada',
   'Por temporada',
   'Honorarios',
-  'Prácticas profesionales',
+  'Pr\u00e1cticas profesionales',
   'Medio tiempo'
 ]);
 
@@ -105,7 +105,7 @@ const estadoCivilOptions = createOptions([
   'Casado(a)',
   'Divorciado(a)',
   'Viudo(a)',
-  'Unión libre'
+  'Uni\u00f3n libre'
 ]);
 
 const generoOptions = createOptions([
@@ -116,14 +116,14 @@ const generoOptions = createOptions([
 ]);
 
 const paisOptions = createOptions([
-  'México',
+  'M\u00e9xico',
   'Estados Unidos',
-  'Canadá',
+  'Canad\u00e1',
   'Colombia',
   'Argentina',
   'Chile',
-  'Perú',
-  'España'
+  'Per\u00fa',
+  'Espa\u00f1a'
 ]);
 
 const bancoOptions = createOptions([
@@ -172,28 +172,46 @@ const monedaOptions = createOptions([
 const catalogSelectStyles = {
   control: (base, state) => ({
     ...base,
-    minHeight: 42,
-    borderColor: state.isFocused ? '#092052' : '#d1d5db',
-    boxShadow: state.isFocused ? '0 0 0 1px #092052' : 'none',
+    minHeight: 48,
+    borderColor: state.isFocused ? '#17346f' : '#d7e0ee',
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,249,252,0.98))',
+    boxShadow: state.isFocused ? '0 0 0 3px rgba(23,52,111,0.12)' : '0 8px 20px rgba(15, 45, 93, 0.05)',
     '&:hover': {
-      borderColor: '#092052'
+      borderColor: '#17346f'
     },
-    borderRadius: 6,
+    borderRadius: 16,
     fontSize: '0.875rem'
   }),
   valueContainer: (base) => ({
     ...base,
-    padding: '0 12px'
+    padding: '2px 14px'
   }),
   placeholder: (base) => ({
     ...base,
-    color: '#9ca3af'
+    color: '#94a3b8'
+  }),
+  singleValue: (base) => ({
+    ...base,
+    color: '#0f172a'
+  }),
+  indicatorSeparator: () => ({
+    display: 'none'
   }),
   menu: (base) => ({
     ...base,
+    borderRadius: 16,
+    overflow: 'hidden',
+    boxShadow: '0 18px 36px rgba(15, 45, 93, 0.14)',
     zIndex: 30
   })
 };
+
+const premiumFieldClass = 'w-full rounded-2xl border border-[#d7e0ee] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,249,252,0.98))] px-4 py-3 text-sm text-slate-800 shadow-[0_8px_20px_rgba(15,45,93,0.05)] outline-none transition placeholder:text-slate-400 focus:border-[#17346f] focus:ring-4 focus:ring-[#17346f]/10';
+const premiumSectionClass = 'rounded-[26px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,247,251,0.98))] p-4 shadow-[0_18px_40px_rgba(15,45,93,0.08)] sm:rounded-[28px] sm:p-5';
+const primaryButtonClass = 'inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#1b3d86,#0f2556)] px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(15,45,93,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_32px_rgba(15,45,93,0.3)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none';
+const secondaryButtonClass = 'inline-flex items-center justify-center rounded-2xl border border-[#d7e0ee] bg-white/90 px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,45,93,0.06)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:text-slate-900';
+const subtleDangerButtonClass = 'inline-flex items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100';
+const tableShellClass = 'overflow-hidden rounded-[28px] border border-white/70 bg-white/95 shadow-[0_18px_40px_rgba(15,45,93,0.08)]';
 
 function findSelectedOption(options, value) {
   if (!value) return null;
@@ -292,9 +310,50 @@ export default function RH() {
     return [{ name: 'Todos', total: usuarios.length }, ...departamentos];
   }, [usuarios]);
 
+  const selectedUser = useMemo(
+    () => usuarios.find((u) => Number(u.User_Id) === Number(selectedUserId)) || null,
+    [usuarios, selectedUserId]
+  );
+
+  const modalTabs = [
+    { key: 'perfil', label: 'Perfil RH', helper: 'Datos generales, laborales y salud' },
+    { key: 'contactos', label: 'Contactos', helper: 'Emergencia y respaldo familiar' },
+    { key: 'cuentas', label: 'Cuentas', helper: 'Dispersión bancaria y titularidad' },
+    { key: 'documentos', label: 'Documentos', helper: 'Expediente digital del colaborador' }
+  ];
+
+  const expedienteStats = useMemo(() => ([
+    {
+      label: 'No. empleado',
+      value: profileForm.NumeroEmpleado || selectedUser?.NumeroEmpleado || 'Pendiente',
+      tone: 'text-slate-900'
+    },
+    {
+      label: 'Contactos',
+      value: String(contactos.length),
+      tone: 'text-[#17346f]'
+    },
+    {
+      label: 'Cuentas',
+      value: String(cuentas.length),
+      tone: 'text-emerald-700'
+    },
+    {
+      label: 'Documentos',
+      value: String(documentos.length),
+      tone: 'text-rose-700'
+    }
+  ]), [
+    contactos.length,
+    cuentas.length,
+    documentos.length,
+    profileForm.NumeroEmpleado,
+    selectedUser?.NumeroEmpleado
+  ]);
+
   const cargarEmpresas = async () => {
     try {
-      const res = await api.get('/companies');
+      const res = await api.get('/companies/');
       setCompanies(res.data || []);
     } catch (error) {
       console.error('Error cargando empresas RH', error);
@@ -358,6 +417,8 @@ export default function RH() {
 
   useEffect(() => {
     cargarUsuarios();
+    // La carga se dispara intencionalmente cuando cambia la empresa seleccionada.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCompany]);
 
   const resolveFotoUrl = (value) => {
@@ -380,7 +441,7 @@ export default function RH() {
         }
 
         return rawValue;
-      } catch (_) {
+      } catch {
         return rawValue;
       }
     }
@@ -421,7 +482,7 @@ export default function RH() {
       const url = new URL(baseResolved, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
       url.pathname = url.pathname.replace(/^\/uploads\//i, '/api/uploads/');
       return url.toString();
-    } catch (_) {
+    } catch {
       return baseResolved.replace(/^\/uploads\//i, '/api/uploads/');
     }
   };
@@ -454,7 +515,7 @@ export default function RH() {
         } else {
           notify('No se encontró información para ese código postal', 'warning');
         }
-      } catch (_) {
+      } catch {
         notify('No se pudo obtener datos del código postal', 'warning');
       } finally {
         setLoadingCP(false);
@@ -751,24 +812,64 @@ export default function RH() {
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#eef1f5] p-4 md:p-6 overflow-auto">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <h2 className="text-3xl font-semibold text-[#1d2430]">Empleados</h2>
+    <div className="w-full min-h-screen overflow-auto bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.88),_transparent_30%),linear-gradient(180deg,#edf2f8_0%,#e7edf5_48%,#edf2f7_100%)] p-4 md:p-6">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+        <div className="space-y-1">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#6b7a96]">Capital humano</p>
+          <h2 className="text-3xl font-semibold tracking-tight text-[#1d2430]">Empleados</h2>
+          <p className="text-sm text-slate-500">Gestiona expedientes, filtros y accesos del equipo desde un solo panel.</p>
         </div>
-        <div className="text-sm text-gray-600">
-          {usuariosFiltrados.length} / {usuarios.length}
+        <div className="flex items-center gap-3">
+          <span className="rounded-full border border-white/80 bg-white/75 px-3 py-1.5 text-sm font-medium text-slate-600 shadow-sm">
+            {usuariosFiltrados.length} / {usuarios.length}
+          </span>
+          {usuariosFiltrados.length > 0 && (
+            <button
+              onClick={() => {
+                const rows = usuariosFiltrados.map(u => ({
+                  Nombre: `${u.Name || ''} ${u.Lastname || ''}`.trim(),
+                  Email: u.Email || '',
+                  NumeroEmpleado: u.NumeroEmpleado || '',
+                  Puesto: u.Puesto || '',
+                  Departamento: u.Departamento || '',
+                  TipoContrato: u.TipoContrato || '',
+                  FechaIngreso: u.FechaIngreso ? String(u.FechaIngreso).slice(0,10) : '',
+                  SalarioMensual: u.SalarioMensual || '',
+                  RFC: u.RFC || '',
+                  CURP: u.CURP || '',
+                  NSS: u.NSS || '',
+                  Empresa: u.NameCompany || '',
+                }));
+                const csv = [
+                  Object.keys(rows[0]).join(','),
+                  ...rows.map(r => Object.values(r).map(v => `"${String(v).replace(/"/g,'""')}"`).join(','))
+                ].join('\n');
+                const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'empleados_rh.csv';
+                document.body.appendChild(a); a.click(); a.remove();
+                URL.revokeObjectURL(url);
+              }}
+              className="rounded-xl bg-gradient-to-r from-[#17408b] to-[#2e67d1] px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(23,64,139,0.18)] transition hover:from-[#12356e] hover:to-[#2559ba]"
+            >
+              Exportar CSV
+            </button>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-        <aside className="xl:col-span-2 bg-[#f7f8fa] border border-gray-200 rounded-lg p-3 h-fit">
-          <p className="text-sm font-extrabold tracking-wide text-gray-800 mb-3">🧑‍🤝‍🧑 DEPARTAMENTO</p>
-          <div className="mb-3">
+        <aside className="xl:col-span-3 2xl:col-span-2 h-fit rounded-[28px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(245,248,252,0.92))] p-4 shadow-[0_18px_40px_rgba(15,45,93,0.08)]">
+          <div className="mb-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#7b8aa6]">Filtro maestro</p>
+            <h3 className="mt-1 text-lg font-semibold text-[#1d2430]">Departamentos</h3>
+          </div>
+          <div className="mb-4">
             <select
               value={selectedCompany}
               onChange={(e) => setSelectedCompany(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-2 text-sm w-full bg-white"
+              className="w-full rounded-2xl border border-[#d5ddeb] bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#17408b] focus:ring-2 focus:ring-[#17408b]/10"
             >
               <option value="all">Todas las empresas</option>
               {companies.map((c) => (
@@ -776,7 +877,7 @@ export default function RH() {
               ))}
             </select>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             {departamentoStats.map((item) => {
               const isActive = selectedDepartment === item.name;
               return (
@@ -784,31 +885,41 @@ export default function RH() {
                   key={item.name}
                   type="button"
                   onClick={() => setSelectedDepartment(item.name)}
-                  className={`w-full px-3 py-2 rounded text-sm flex items-center justify-between ${isActive ? 'bg-blue-100 text-[#0f2b5b] font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}
+                  className={`flex w-full items-center justify-between rounded-2xl px-3.5 py-3 text-sm transition ${
+                    isActive
+                      ? 'bg-gradient-to-r from-[#dde9fb] to-[#edf4ff] text-[#10366f] shadow-[inset_0_0_0_1px_rgba(23,64,139,0.08)]'
+                      : 'text-slate-600 hover:bg-white hover:text-[#12356e]'
+                  }`}
                 >
-                  <span>{item.name}</span>
-                  <span className="text-gray-500">{item.total}</span>
+                  <span className={`truncate ${isActive ? 'font-semibold' : 'font-medium'}`}>{item.name}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${isActive ? 'bg-white text-[#10366f]' : 'bg-slate-100 text-slate-500'}`}>{item.total}</span>
                 </button>
               );
             })}
           </div>
         </aside>
 
-        <section className="xl:col-span-10 space-y-4">
-          <div className="bg-white border border-gray-200 rounded-lg p-3 flex flex-wrap items-center gap-3">
+        <section className="xl:col-span-9 2xl:col-span-10 space-y-4">
+          <div className="rounded-[26px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(246,249,253,0.92))] p-4 shadow-[0_18px_40px_rgba(15,45,93,0.08)]">
+            <div className="flex flex-wrap items-center gap-3">
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar..."
-              className="border border-gray-300 rounded px-3 py-2 text-sm flex-1 min-w-[220px]"
+              placeholder="Buscar por nombre, correo, puesto o departamento"
+              className="min-w-[220px] flex-1 rounded-2xl border border-[#d5ddeb] bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#17408b] focus:ring-2 focus:ring-[#17408b]/10"
             />
-            <div className="text-sm text-gray-500">Departamento: <span className="font-medium text-gray-700">{selectedDepartment}</span></div>
+            <div className="rounded-2xl border border-[#dce3ef] bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
+              Departamento: <span className="font-semibold text-slate-700">{selectedDepartment}</span>
+            </div>
+            </div>
           </div>
 
           {loadingUsuarios ? (
-            <div className="bg-white border border-gray-200 rounded-lg p-6 text-sm text-gray-600">Cargando colaboradores...</div>
+            <div className="rounded-[26px] border border-white/80 bg-white/90 p-6 text-sm text-slate-600 shadow-[0_18px_40px_rgba(15,45,93,0.08)]">
+              Cargando colaboradores...
+            </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
               {usuariosFiltrados.map((u) => {
                 const isSelected = Number(selectedUserId) === Number(u.User_Id);
                 const foto = resolveFotoUrl(u.FotoPerfilUrl);
@@ -821,9 +932,11 @@ export default function RH() {
                     key={u.User_Id}
                     type="button"
                     onClick={() => seleccionarUsuario(u)}
-                    className={`bg-white border rounded-md shadow-sm overflow-hidden text-left hover:shadow transition ${isSelected ? 'border-[#5e6ad2] ring-1 ring-[#5e6ad2]' : 'border-gray-200'}`}
+                    className={`overflow-hidden rounded-[28px] border bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,253,0.94))] text-left shadow-[0_16px_36px_rgba(15,45,93,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_44px_rgba(15,45,93,0.14)] ${
+                      isSelected ? 'border-[#4f6edb] ring-2 ring-[#4f6edb]/20' : 'border-white/80'
+                    }`}
                   >
-                    <div className="flex min-h-[170px]">
+                    <div className="flex min-h-[182px]">
                       <div className={`w-28 shrink-0 ${colorClass} flex items-center justify-center`}>
                         {foto && !hideBrokenFoto ? (
                           <img
@@ -848,18 +961,20 @@ export default function RH() {
                           <span className="text-white text-6xl font-light leading-none">{initials.charAt(0)}</span>
                         )}
                       </div>
-                      <div className="flex-1 p-3 flex flex-col justify-between">
+                      <div className="flex flex-1 flex-col justify-between p-4">
                         <div>
-                          <p className="font-semibold text-gray-900 leading-tight">{u.Name} {u.Lastname}</p>
-                          <p className="text-[13px] text-gray-700">💼 {u.Puesto || 'Sin puesto'}</p>
-                          <p className="text-[13px] text-gray-700 truncate">✉️ {u.Email || 'Sin correo'}</p>
-                          <p className="text-[13px] text-gray-700">📞 {u.PhoneNumber || 'Sin teléfono'}</p>
+                          <p className="text-lg font-semibold leading-tight text-slate-900">{u.Name} {u.Lastname}</p>
+                          <div className="mt-2 space-y-1.5 text-[13px] text-slate-600">
+                            <p>{u.Puesto || 'Sin puesto asignado'}</p>
+                            <p className="truncate">{u.Email || 'Sin correo registrado'}</p>
+                            <p>{u.PhoneNumber || 'Sin teléfono registrado'}</p>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between pt-2">
-                          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-pink-100 text-pink-700">
+                        <div className="flex items-center justify-between pt-3">
+                          <span className="inline-flex rounded-full bg-gradient-to-r from-pink-100 to-rose-100 px-3 py-1 text-xs font-semibold text-pink-700">
                             {u.Departamento || 'Sin departamento'}
                           </span>
-                          <span className="inline-flex items-center justify-center w-7 h-7 rounded text-xs font-bold text-white bg-emerald-600">
+                          <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl bg-emerald-600 text-xs font-bold text-white shadow-sm">
                             {initials.charAt(0)}
                           </span>
                         </div>
@@ -870,7 +985,7 @@ export default function RH() {
               })}
 
               {usuariosFiltrados.length === 0 && (
-                <div className="col-span-full bg-white border border-gray-200 rounded-lg p-6 text-sm text-gray-500">
+                <div className="col-span-full rounded-[26px] border border-white/80 bg-white/90 p-8 text-sm text-slate-500 shadow-[0_18px_40px_rgba(15,45,93,0.08)]">
                   No hay colaboradores para mostrar con este filtro.
                 </div>
               )}
@@ -881,75 +996,143 @@ export default function RH() {
 
       {selectedUserId && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 p-3 md:p-6 flex items-start justify-center"
+          className="fixed inset-0 z-50 flex items-start justify-center bg-[rgba(3,10,28,0.62)] p-2 backdrop-blur-[2px] sm:p-4 md:p-6"
           onClick={() => {
             setSelectedUserId(null);
             setSelectedUserLabel('');
           }}
         >
           <div
-            className="w-full max-w-6xl max-h-[94vh] overflow-y-auto border border-gray-200 rounded-xl p-4 bg-white"
+            className="flex max-h-[96vh] w-full max-w-7xl flex-col overflow-hidden rounded-[28px] border border-white/30 bg-[linear-gradient(180deg,rgba(247,250,253,0.99),rgba(236,242,248,0.99))] shadow-[0_40px_100px_rgba(2,10,28,0.36)] sm:rounded-[32px]"
             onClick={(e) => e.stopPropagation()}
           >
             {loadingDetalle ? (
-              <p className="text-sm text-gray-600">Cargando expediente RH...</p>
-            ) : (
-              <>
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm text-gray-500">Colaborador seleccionado</p>
-                    <h3 className="text-xl font-semibold text-gray-900">{selectedUserLabel}</h3>
+              <div className="p-6 md:p-8">
+                {/* Skeleton — mismo shape que el header real */}
+                <div className="animate-pulse rounded-[26px] bg-[linear-gradient(135deg,#d0d9ec,#c8d4e8)] p-5 md:p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="h-20 w-20 shrink-0 rounded-[22px] bg-white/30" />
+                    <div className="flex-1 space-y-3 pt-1">
+                      <div className="h-2.5 w-24 rounded-full bg-white/40" />
+                      <div className="h-7 w-56 rounded-full bg-white/50" />
+                      <div className="h-3.5 w-full max-w-sm rounded-full bg-white/30" />
+                      <div className="flex gap-2 pt-1">
+                        <div className="h-6 w-28 rounded-full bg-white/30" />
+                        <div className="h-6 w-24 rounded-full bg-white/25" />
+                      </div>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedUserId(null);
-                      setSelectedUserLabel('');
-                    }}
-                    className="px-3 py-1.5 rounded bg-gray-100 text-gray-700 text-sm hover:bg-gray-200"
-                  >
-                    Cerrar
-                  </button>
+                </div>
+                <div className="mt-4 animate-pulse rounded-[22px] bg-slate-200/60 p-3">
+                  <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+                    {[0,1,2,3].map(i => <div key={i} className="h-16 rounded-[18px] bg-white/70" />)}
+                  </div>
+                </div>
+                <div className="mt-4 animate-pulse space-y-3 rounded-[22px] border border-white/60 bg-white/80 p-5">
+                  <div className="h-2 w-20 rounded-full bg-slate-200" />
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {[0,1,2,3,4,5].map(i => <div key={i} className="h-12 rounded-2xl bg-slate-100" />)}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+                {/* Header ejecutivo */}
+                <div className="shrink-0 rounded-t-[28px] bg-[linear-gradient(135deg,#0f2556,#1c3f87_58%,#285fb3)] p-4 text-white shadow-[0_8px_24px_rgba(9,32,82,0.22)] sm:rounded-t-[32px] sm:p-5 md:p-6">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+                      <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-[22px] sm:h-20 sm:w-20 sm:rounded-[26px] ${getColorClass(selectedUser?.User_Id || 0)} text-2xl font-semibold text-white shadow-[0_12px_28px_rgba(15,23,42,0.28)]`}>
+                        {selectedUser && resolveFotoUrl(selectedUser.FotoPerfilUrl) ? (
+                          <img
+                            src={resolveFotoUrl(selectedUser.FotoPerfilUrl)}
+                            alt={selectedUserLabel}
+                            className="h-full w-full rounded-[22px] object-cover sm:rounded-[26px]"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
+                        ) : (
+                          getInitials(selectedUser || {}).slice(0, 2)
+                        )}
+                      </div>
+                      <div className="min-w-0 space-y-2">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-blue-100/75 sm:text-[11px]">Expediente RH</p>
+                        <h3 className="truncate text-xl font-semibold tracking-tight text-white sm:text-2xl md:text-[2rem]">{selectedUserLabel}</h3>
+                        <p className="hidden max-w-2xl text-sm text-blue-100/75 sm:block">
+                          {"Vista integral del colaborador \u2014 datos laborales, bancarios, contactos y documentos."}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 text-[11px] font-semibold sm:gap-2 sm:text-xs">
+                          <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-white/90 sm:px-3 sm:py-1.5">
+                            {selectedUser?.Puesto || 'Sin puesto'}
+                          </span>
+                          <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-white/90 sm:px-3 sm:py-1.5">
+                            {selectedUser?.Departamento || 'Sin departamento'}
+                          </span>
+                          {selectedUser?.Email && (
+                            <span className="hidden rounded-full border border-emerald-300/30 bg-emerald-400/15 px-2.5 py-1 text-emerald-50 sm:inline-flex sm:px-3 sm:py-1.5">
+                              {selectedUser.Email}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedUserId(null); setSelectedUserLabel(''); }}
+                      className="shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-white transition hover:bg-white/20 sm:h-auto sm:w-auto sm:px-4 sm:py-2.5 sm:text-sm sm:font-semibold"
+                      aria-label="Cerrar expediente"
+                    >
+                      <svg className="h-4 w-4 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      <span className="hidden sm:inline">Cerrar expediente</span>
+                    </button>
+                  </div>
                 </div>
 
-              <div className="flex gap-2 mb-4">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('perfil')}
-                  className={`px-3 py-2 rounded text-sm ${activeTab === 'perfil' ? 'bg-[#092052] text-white' : 'bg-gray-200 text-gray-800'}`}
-                >
-                  Perfil RH
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('contactos')}
-                  className={`px-3 py-2 rounded text-sm ${activeTab === 'contactos' ? 'bg-[#092052] text-white' : 'bg-gray-200 text-gray-800'}`}
-                >
-                  Contactos de emergencia
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('cuentas')}
-                  className={`px-3 py-2 rounded text-sm ${activeTab === 'cuentas' ? 'bg-[#092052] text-white' : 'bg-gray-200 text-gray-800'}`}
-                >
-                  Cuentas bancarias
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('documentos')}
-                  className={`px-3 py-2 rounded text-sm ${activeTab === 'documentos' ? 'bg-[#092052] text-white' : 'bg-gray-200 text-gray-800'}`}
-                >
-                  Documentos
-                </button>
-              </div>
+                {/* Tab bar */}
+                <div className="shrink-0 border-b border-slate-200/70 bg-white/85 px-2 py-2 backdrop-blur-sm sm:px-3">
+                  <div className="mb-2 grid grid-cols-2 gap-2 xl:grid-cols-4">
+                    {expedienteStats.map((stat) => (
+                      <div
+                        key={stat.label}
+                        className="rounded-[18px] border border-slate-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(244,247,251,0.96))] px-3 py-3 shadow-[0_8px_18px_rgba(15,45,93,0.05)]"
+                      >
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">{stat.label}</p>
+                        <p className={`mt-1 truncate text-sm font-semibold sm:text-base ${stat.tone}`}>{stat.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 xl:grid-cols-4">
+                    {modalTabs.map((tab) => {
+                      const isActive = activeTab === tab.key;
+                      return (
+                        <button
+                          key={tab.key}
+                          type="button"
+                          onClick={() => setActiveTab(tab.key)}
+                          className={`rounded-[18px] px-3 py-3 text-left transition sm:px-4 ${
+                            isActive
+                              ? 'bg-[linear-gradient(135deg,#15336d,#2453a4)] text-white shadow-[0_12px_24px_rgba(15,45,93,0.18)]'
+                              : 'bg-transparent hover:bg-slate-100/80'
+                          }`}
+                        >
+                          <p className={`text-xs font-bold sm:text-sm ${isActive ? 'text-white' : 'text-slate-900'}`}>{tab.label}</p>
+                          <p className={`mt-0.5 hidden text-[11px] sm:block ${isActive ? 'text-blue-100/75' : 'text-slate-500'}`}>{tab.helper}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Tab content */}
+                <div className="flex-1 overflow-y-auto p-3 sm:p-4">
 
               {activeTab === 'perfil' && (
-                <form onSubmit={guardarPerfil} className="space-y-4">
-                  <div className="border border-gray-200 rounded-lg p-3 flex items-center gap-4">
+                <form onSubmit={guardarPerfil} className="space-y-4 lg:space-y-5">
+                  <div className={`${premiumSectionClass} flex flex-col gap-4 md:flex-row md:items-center md:justify-between`}>
                     <img
                       src={fotoPreview || 'https://ui-avatars.com/api/?name=RH&background=092052&color=fff'}
                       alt="Foto de perfil"
-                      className="w-20 h-20 rounded-full object-cover border border-gray-300"
+                      className="h-24 w-24 rounded-[28px] border border-white/70 object-cover shadow-[0_18px_34px_rgba(15,45,93,0.16)]"
                       onError={(e) => {
                         const current = e.currentTarget;
                         const triedApiFallback = current.dataset.apiFallbackTried === '1';
@@ -964,87 +1147,187 @@ export default function RH() {
                         setFotoPreview('');
                       }}
                     />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">Foto de perfil</p>
-                      <p className="text-xs text-gray-600 mb-2">Formatos permitidos: JPG, PNG, WEBP</p>
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Identidad visual</p>
+                      <p className="mt-2 text-lg font-semibold text-slate-900">Foto de perfil</p>
+                      <p className="mb-3 mt-1 text-sm text-slate-500">Formatos permitidos: JPG, PNG, WEBP</p>
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
                         onChange={handleFotoPerfilChange}
                         disabled={uploadingFoto}
-                        className="text-sm"
+                        className={`${premiumFieldClass} file:mr-4 file:rounded-xl file:border-0 file:bg-[#17346f] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white`}
                       />
-                      {uploadingFoto && <p className="text-xs text-blue-700 mt-1">Subiendo imagen...</p>}
+                      {uploadingFoto && <p className="mt-2 text-xs font-medium text-[#17346f]">Subiendo imagen...</p>}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <input name="NumeroEmpleado" value={profileForm.NumeroEmpleado} onChange={handleProfileChange} placeholder="Número de empleado" className="border border-gray-300 rounded px-3 py-2 text-sm" />
-                    <CatalogSelectField value={profileForm.Puesto} onChange={(value) => handleProfileCatalogChange('Puesto', value)} options={puestoOptions} placeholder="Puesto" />
-                    <CatalogSelectField value={profileForm.Departamento} onChange={(value) => handleProfileCatalogChange('Departamento', value)} options={departamentoOptions} placeholder="Departamento" />
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs font-medium text-gray-600">Fecha de ingreso</label>
-                      <input type="date" name="FechaIngreso" value={profileForm.FechaIngreso} onChange={handleProfileChange} className="border border-gray-300 rounded px-3 py-2 text-sm" />
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    {/* Bloque laboral */}
+                    <div className={premiumSectionClass}>
+                      <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.24em] text-[#6b7a96]">Datos laborales</p>
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Numero de empleado</label>
+                          <input name="NumeroEmpleado" value={profileForm.NumeroEmpleado} onChange={handleProfileChange} placeholder="Ej. EMP-001" className={premiumFieldClass} />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Puesto</label>
+                          <CatalogSelectField value={profileForm.Puesto} onChange={(value) => handleProfileCatalogChange('Puesto', value)} options={puestoOptions} placeholder="Puesto" />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Departamento</label>
+                          <CatalogSelectField value={profileForm.Departamento} onChange={(value) => handleProfileCatalogChange('Departamento', value)} options={departamentoOptions} placeholder="Departamento" />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Fecha de ingreso</label>
+                          <input type="date" name="FechaIngreso" value={profileForm.FechaIngreso} onChange={handleProfileChange} className={premiumFieldClass} />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Tipo de contrato</label>
+                          <CatalogSelectField value={profileForm.TipoContrato} onChange={(value) => handleProfileCatalogChange('TipoContrato', value)} options={tipoContratoOptions} placeholder="Tipo de contrato" />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Salario mensual</label>
+                          <input type="number" step="0.01" name="SalarioMensual" value={profileForm.SalarioMensual} onChange={handleProfileChange} placeholder="0.00" className={premiumFieldClass} />
+                        </div>
+                      </div>
                     </div>
-                    <CatalogSelectField value={profileForm.TipoContrato} onChange={(value) => handleProfileCatalogChange('TipoContrato', value)} options={tipoContratoOptions} placeholder="Tipo de contrato" />
-                    <input type="number" step="0.01" name="SalarioMensual" value={profileForm.SalarioMensual} onChange={handleProfileChange} placeholder="Salario mensual" className="border border-gray-300 rounded px-3 py-2 text-sm" />
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs font-medium text-gray-600">Fecha de nacimiento</label>
-                      <input type="date" name="FechaNacimiento" value={profileForm.FechaNacimiento} onChange={handleProfileChange} className="border border-gray-300 rounded px-3 py-2 text-sm" />
+
+                    {/* Bloque identificacion */}
+                    <div className={premiumSectionClass}>
+                      <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.24em] text-[#6b7a96]">Identificacion</p>
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Fecha de nacimiento</label>
+                          <input type="date" name="FechaNacimiento" value={profileForm.FechaNacimiento} onChange={handleProfileChange} className={premiumFieldClass} />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Estado civil</label>
+                          <CatalogSelectField value={profileForm.EstadoCivil} onChange={(value) => handleProfileCatalogChange('EstadoCivil', value)} options={estadoCivilOptions} placeholder="Estado civil" />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Genero</label>
+                          <CatalogSelectField value={profileForm.Genero} onChange={(value) => handleProfileCatalogChange('Genero', value)} options={generoOptions} placeholder="Genero" />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">CURP</label>
+                          <input name="CURP" value={profileForm.CURP} onChange={handleProfileChange} placeholder="18 caracteres" className={premiumFieldClass} />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">RFC</label>
+                          <input name="RFC" value={profileForm.RFC} onChange={handleProfileChange} placeholder="RFC con homoclave" className={premiumFieldClass} />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">NSS</label>
+                          <input name="NSS" value={profileForm.NSS} onChange={handleProfileChange} placeholder="Numero de seguridad social" className={premiumFieldClass} />
+                        </div>
+                      </div>
                     </div>
-                    <input name="CURP" value={profileForm.CURP} onChange={handleProfileChange} placeholder="CURP" className="border border-gray-300 rounded px-3 py-2 text-sm" />
-                    <input name="RFC" value={profileForm.RFC} onChange={handleProfileChange} placeholder="RFC" className="border border-gray-300 rounded px-3 py-2 text-sm" />
-                    <input name="NSS" value={profileForm.NSS} onChange={handleProfileChange} placeholder="NSS" className="border border-gray-300 rounded px-3 py-2 text-sm" />
-                    <CatalogSelectField value={profileForm.EstadoCivil} onChange={(value) => handleProfileCatalogChange('EstadoCivil', value)} options={estadoCivilOptions} placeholder="Estado civil" />
-                    <CatalogSelectField value={profileForm.Genero} onChange={(value) => handleProfileCatalogChange('Genero', value)} options={generoOptions} placeholder="Género" />
-                    <input name="Direccion" value={profileForm.Direccion} onChange={handleProfileChange} placeholder="Dirección" className="border border-gray-300 rounded px-3 py-2 text-sm md:col-span-2" />
-                    <div className="relative">
-                      <input
-                        name="CodigoPostal"
-                        value={profileForm.CodigoPostal}
-                        onChange={handleCodigoPostalChange}
-                        placeholder="Código postal"
-                        maxLength={5}
-                        inputMode="numeric"
-                        className="border border-gray-300 rounded px-3 py-2 text-sm w-full pr-8"
-                      />
-                      {loadingCP && (
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 animate-spin text-blue-600 text-xs">⏳</span>
-                      )}
-                    </div>
-                    <input
-                      name="Ciudad"
-                      value={profileForm.Ciudad}
-                      onChange={handleProfileChange}
-                      placeholder={loadingCP ? 'Buscando...' : 'Ciudad'}
-                      disabled={loadingCP}
-                      className={`border border-gray-300 rounded px-3 py-2 text-sm ${loadingCP ? 'bg-gray-100 text-gray-400' : ''}`}
-                    />
-                    <input
-                      name="Estado"
-                      value={profileForm.Estado}
-                      onChange={handleProfileChange}
-                      placeholder={loadingCP ? 'Buscando...' : 'Estado'}
-                      disabled={loadingCP}
-                      className={`border border-gray-300 rounded px-3 py-2 text-sm ${loadingCP ? 'bg-gray-100 text-gray-400' : ''}`}
-                    />
-                    <CatalogSelectField value={profileForm.Pais} onChange={(value) => handleProfileCatalogChange('Pais', value)} options={paisOptions} placeholder="País" />
-                    <input name="ContactoEmergenciaPrincipal" value={profileForm.ContactoEmergenciaPrincipal} onChange={handleProfileChange} placeholder="Contacto emergencia principal" className="border border-gray-300 rounded px-3 py-2 text-sm md:col-span-2" />
-                    <input name="TelefonoEmergenciaPrincipal" value={profileForm.TelefonoEmergenciaPrincipal} onChange={handleProfileChange} placeholder="Teléfono emergencia" className="border border-gray-300 rounded px-3 py-2 text-sm" />
-                    <CatalogSelectField value={profileForm.BancoPrincipal} onChange={(value) => handleProfileCatalogChange('BancoPrincipal', value)} options={bancoOptions} placeholder="Banco principal" />
-                    <input name="NumeroCuentaPrincipal" value={profileForm.NumeroCuentaPrincipal} onChange={handleProfileChange} placeholder="Número de cuenta principal" className="border border-gray-300 rounded px-3 py-2 text-sm" />
-                    <input name="CLABE" value={profileForm.CLABE} onChange={handleProfileChange} placeholder="CLABE" className="border border-gray-300 rounded px-3 py-2 text-sm" />
-                    <input name="NombreTitularCuenta" value={profileForm.NombreTitularCuenta} onChange={handleProfileChange} placeholder="Titular de la cuenta" className="border border-gray-300 rounded px-3 py-2 text-sm md:col-span-2" />
-                    <CatalogSelectField value={profileForm.TipoSangre} onChange={(value) => handleProfileCatalogChange('TipoSangre', value)} options={tipoSangreOptions} placeholder="Tipo de sangre" />
-                    <input name="Alergias" value={profileForm.Alergias} onChange={handleProfileChange} placeholder="Alergias" className="border border-gray-300 rounded px-3 py-2 text-sm md:col-span-2" />
-                    <textarea name="NotasMedicas" value={profileForm.NotasMedicas} onChange={handleProfileChange} placeholder="Notas médicas" className="border border-gray-300 rounded px-3 py-2 text-sm md:col-span-3 min-h-24" />
                   </div>
 
-                  <div>
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    {/* Bloque domicilio */}
+                    <div className={premiumSectionClass}>
+                      <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.24em] text-[#6b7a96]">Domicilio</p>
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="flex flex-col gap-1.5 md:col-span-2">
+                          <label className="text-xs font-semibold text-slate-600">Direccion</label>
+                          <input name="Direccion" value={profileForm.Direccion} onChange={handleProfileChange} placeholder="Calle, numero, colonia" className={premiumFieldClass} />
+                        </div>
+                        <div className="flex flex-col gap-1.5 relative">
+                          <label className="text-xs font-semibold text-slate-600">Codigo postal</label>
+                          <input
+                            name="CodigoPostal"
+                            value={profileForm.CodigoPostal}
+                            onChange={handleCodigoPostalChange}
+                            placeholder="5 digitos"
+                            maxLength={5}
+                            inputMode="numeric"
+                            className={`${premiumFieldClass} pr-10`}
+                          />
+                          {loadingCP && (
+                            <span className="absolute bottom-3 right-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#17346f]">...</span>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Pais</label>
+                          <CatalogSelectField value={profileForm.Pais} onChange={(value) => handleProfileCatalogChange('Pais', value)} options={paisOptions} placeholder="Pais" />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Ciudad</label>
+                          <input
+                            name="Ciudad"
+                            value={profileForm.Ciudad}
+                            onChange={handleProfileChange}
+                            placeholder={loadingCP ? 'Buscando...' : 'Ciudad'}
+                            disabled={loadingCP}
+                            className={`${premiumFieldClass} ${loadingCP ? 'opacity-60' : ''}`}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Estado</label>
+                          <input
+                            name="Estado"
+                            value={profileForm.Estado}
+                            onChange={handleProfileChange}
+                            placeholder={loadingCP ? 'Buscando...' : 'Estado'}
+                            disabled={loadingCP}
+                            className={`${premiumFieldClass} ${loadingCP ? 'opacity-60' : ''}`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bloque salud y banco */}
+                    <div className={premiumSectionClass}>
+                      <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.24em] text-[#6b7a96]">Salud y cuenta bancaria principal</p>
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="flex flex-col gap-1.5 md:col-span-2">
+                          <label className="text-xs font-semibold text-slate-600">Contacto de emergencia principal</label>
+                          <input name="ContactoEmergenciaPrincipal" value={profileForm.ContactoEmergenciaPrincipal} onChange={handleProfileChange} placeholder="Nombre del contacto" className={premiumFieldClass} />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Telefono de emergencia</label>
+                          <input name="TelefonoEmergenciaPrincipal" value={profileForm.TelefonoEmergenciaPrincipal} onChange={handleProfileChange} placeholder="+52 000 000 0000" className={premiumFieldClass} />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Banco principal</label>
+                          <CatalogSelectField value={profileForm.BancoPrincipal} onChange={(value) => handleProfileCatalogChange('BancoPrincipal', value)} options={bancoOptions} placeholder="Banco" />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Numero de cuenta</label>
+                          <input name="NumeroCuentaPrincipal" value={profileForm.NumeroCuentaPrincipal} onChange={handleProfileChange} placeholder="16 digitos" className={premiumFieldClass} />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">CLABE interbancaria</label>
+                          <input name="CLABE" value={profileForm.CLABE} onChange={handleProfileChange} placeholder="18 digitos" className={premiumFieldClass} />
+                        </div>
+                        <div className="flex flex-col gap-1.5 md:col-span-2">
+                          <label className="text-xs font-semibold text-slate-600">Nombre del titular</label>
+                          <input name="NombreTitularCuenta" value={profileForm.NombreTitularCuenta} onChange={handleProfileChange} placeholder="Nombre como aparece en la cuenta" className={premiumFieldClass} />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Tipo de sangre</label>
+                          <CatalogSelectField value={profileForm.TipoSangre} onChange={(value) => handleProfileCatalogChange('TipoSangre', value)} options={tipoSangreOptions} placeholder="Tipo de sangre" />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-600">Alergias</label>
+                          <input name="Alergias" value={profileForm.Alergias} onChange={handleProfileChange} placeholder="Describe alergias conocidas" className={premiumFieldClass} />
+                        </div>
+                        <div className="flex flex-col gap-1.5 md:col-span-2">
+                          <label className="text-xs font-semibold text-slate-600">Notas medicas</label>
+                          <textarea name="NotasMedicas" value={profileForm.NotasMedicas} onChange={handleProfileChange} placeholder="Condiciones, medicamentos o indicaciones relevantes" className={`${premiumFieldClass} min-h-24 resize-none`} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
                     <button
                       type="submit"
                       disabled={savingProfile}
-                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400"
+                      className={primaryButtonClass}
                     >
                       {savingProfile ? 'Guardando...' : 'Guardar perfil RH'}
                     </button>
@@ -1053,190 +1336,275 @@ export default function RH() {
               )}
 
               {activeTab === 'contactos' && (
-                <div className="space-y-4">
-                  <form onSubmit={guardarContacto} className="grid grid-cols-1 md:grid-cols-3 gap-3 border border-gray-200 rounded-lg p-3">
-                    <input name="Nombre" value={contactoForm.Nombre} onChange={handleContactoChange} placeholder="Nombre" className="border border-gray-300 rounded px-3 py-2 text-sm" />
-                    <CatalogSelectField value={contactoForm.Parentesco} onChange={(value) => handleContactoCatalogChange('Parentesco', value)} options={parentescoOptions} placeholder="Parentesco" />
-                    <input name="Telefono" value={contactoForm.Telefono} onChange={handleContactoChange} placeholder="Teléfono" className="border border-gray-300 rounded px-3 py-2 text-sm" />
-                    <input name="TelefonoAlterno" value={contactoForm.TelefonoAlterno} onChange={handleContactoChange} placeholder="Teléfono alterno" className="border border-gray-300 rounded px-3 py-2 text-sm" />
-                    <input name="Direccion" value={contactoForm.Direccion} onChange={handleContactoChange} placeholder="Dirección" className="border border-gray-300 rounded px-3 py-2 text-sm md:col-span-2" />
-                    <input name="Notas" value={contactoForm.Notas} onChange={handleContactoChange} placeholder="Notas" className="border border-gray-300 rounded px-3 py-2 text-sm md:col-span-2" />
-                    <label className="flex items-center gap-2 text-sm text-gray-700">
-                      <input type="checkbox" name="EsPrincipal" checked={contactoForm.EsPrincipal} onChange={handleContactoChange} />
+                <div className="space-y-5">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#6b7a96]">Respuesta inmediata</p>
+                      <h4 className="mt-1 text-lg font-semibold text-slate-900">Contactos de emergencia</h4>
+                    </div>
+                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
+                      {contactos.length} registrados
+                    </span>
+                  </div>
+                  <form onSubmit={guardarContacto} className={`${premiumSectionClass} grid grid-cols-1 gap-3 md:grid-cols-3`}>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-600">Nombre</label>
+                      <input name="Nombre" value={contactoForm.Nombre} onChange={handleContactoChange} placeholder="Nombre completo" className={premiumFieldClass} />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-600">Parentesco</label>
+                      <CatalogSelectField value={contactoForm.Parentesco} onChange={(value) => handleContactoCatalogChange('Parentesco', value)} options={parentescoOptions} placeholder="Parentesco" />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-600">Telefono</label>
+                      <input name="Telefono" value={contactoForm.Telefono} onChange={handleContactoChange} placeholder="+52 000 000 0000" className={premiumFieldClass} />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-600">Telefono alterno</label>
+                      <input name="TelefonoAlterno" value={contactoForm.TelefonoAlterno} onChange={handleContactoChange} placeholder="Opcional" className={premiumFieldClass} />
+                    </div>
+                    <div className="flex flex-col gap-1.5 md:col-span-2">
+                      <label className="text-xs font-semibold text-slate-600">Direccion</label>
+                      <input name="Direccion" value={contactoForm.Direccion} onChange={handleContactoChange} placeholder="Calle, numero, colonia" className={premiumFieldClass} />
+                    </div>
+                    <div className="flex flex-col gap-1.5 md:col-span-2">
+                      <label className="text-xs font-semibold text-slate-600">Notas</label>
+                      <input name="Notas" value={contactoForm.Notas} onChange={handleContactoChange} placeholder="Informacion adicional" className={premiumFieldClass} />
+                    </div>
+                    <label className="flex items-center gap-3 rounded-2xl border border-[#d7e0ee] bg-slate-50/90 px-4 py-3 text-sm font-medium text-slate-700">
+                      <input type="checkbox" name="EsPrincipal" checked={contactoForm.EsPrincipal} onChange={handleContactoChange} className="h-4 w-4 rounded border-slate-300 text-[#17346f] focus:ring-[#17346f]" />
                       Contacto principal
                     </label>
-                    <div className="md:col-span-3 flex gap-2">
-                      <button type="submit" disabled={savingContacto} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400">
+                    <div className="md:col-span-3 flex flex-wrap gap-3">
+                      <button type="submit" disabled={savingContacto} className={primaryButtonClass}>
                         {savingContacto ? 'Guardando...' : editingContactoId ? 'Actualizar contacto' : 'Agregar contacto'}
                       </button>
                       {editingContactoId && (
-                        <button type="button" onClick={resetContactoForm} className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400">
+                        <button type="button" onClick={resetContactoForm} className={secondaryButtonClass}>
                           Cancelar edición
                         </button>
                       )}
                     </div>
                   </form>
 
-                  <div className="overflow-auto">
-                    <table className="w-full text-left text-sm border-collapse">
-                      <thead>
-                        <tr className="text-gray-600">
-                          <th className="py-2 pr-3">Nombre</th>
-                          <th className="py-2 pr-3">Parentesco</th>
-                          <th className="py-2 pr-3">Teléfono</th>
-                          <th className="py-2 pr-3">Principal</th>
-                          <th className="py-2 pr-3">Acciones</th>
+                  <div className={tableShellClass}>
+                    <div className="overflow-auto">
+                    <table className="w-full min-w-[760px] text-left text-sm border-collapse">
+                      <thead className="bg-slate-50/90 text-slate-500">
+                        <tr>
+                          <th className="px-5 py-4 font-semibold">Nombre</th>
+                          <th className="px-5 py-4 font-semibold">Parentesco</th>
+                          <th className="px-5 py-4 font-semibold">Teléfono</th>
+                          <th className="px-5 py-4 font-semibold">Principal</th>
+                          <th className="px-5 py-4 font-semibold">Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
                         {contactos.map((c) => (
-                          <tr key={c.ContactoEmergencia_Id} className="border-t border-gray-200">
-                            <td className="py-2 pr-3 text-gray-900">{c.Nombre}</td>
-                            <td className="py-2 pr-3 text-gray-900">{c.Parentesco || '-'}</td>
-                            <td className="py-2 pr-3 text-gray-900">{c.Telefono}</td>
-                            <td className="py-2 pr-3 text-gray-900">{c.EsPrincipal ? 'Sí' : 'No'}</td>
-                            <td className="py-2 pr-3">
-                              <div className="flex gap-2">
-                                <button type="button" onClick={() => startEditContacto(c)} className="px-2 py-1 bg-gray-600 text-white rounded">Editar</button>
-                                <button type="button" onClick={() => eliminarContacto(c.ContactoEmergencia_Id)} className="px-2 py-1 bg-red-600 text-white rounded">Eliminar</button>
+                          <tr key={c.ContactoEmergencia_Id} className="border-t border-slate-100 text-slate-700">
+                            <td className="px-5 py-4 font-medium text-slate-900">{c.Nombre}</td>
+                            <td className="px-5 py-4 text-slate-700">{c.Parentesco || '-'}</td>
+                            <td className="px-5 py-4 text-slate-700">{c.Telefono}</td>
+                            <td className="px-5 py-4 text-slate-700">
+                              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${c.EsPrincipal ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                {c.EsPrincipal ? 'Sí' : 'No'}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={() => startEditContacto(c)} className={secondaryButtonClass}>Editar</button>
+                                <button type="button" onClick={() => eliminarContacto(c.ContactoEmergencia_Id)} className={subtleDangerButtonClass}>Eliminar</button>
                               </div>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                    {contactos.length === 0 && <p className="text-sm text-gray-500 mt-2">Sin contactos de emergencia.</p>}
+                    </div>
+                    {contactos.length === 0 && <p className="px-5 py-6 text-sm text-slate-500">Sin contactos de emergencia.</p>}
                   </div>
                 </div>
               )}
 
               {activeTab === 'cuentas' && (
-                <div className="space-y-4">
-                  <form onSubmit={guardarCuenta} className="grid grid-cols-1 md:grid-cols-3 gap-3 border border-gray-200 rounded-lg p-3">
-                    <CatalogSelectField value={cuentaForm.Banco} onChange={(value) => handleCuentaCatalogChange('Banco', value)} options={bancoOptions} placeholder="Banco" />
-                    <input name="NumeroCuenta" value={cuentaForm.NumeroCuenta} onChange={handleCuentaChange} placeholder="Número de cuenta" className="border border-gray-300 rounded px-3 py-2 text-sm" />
-                    <input name="CLABE" value={cuentaForm.CLABE} onChange={handleCuentaChange} placeholder="CLABE" className="border border-gray-300 rounded px-3 py-2 text-sm" />
-                    <input name="NumeroTarjeta" value={cuentaForm.NumeroTarjeta} onChange={handleCuentaChange} placeholder="Número de tarjeta" className="border border-gray-300 rounded px-3 py-2 text-sm" />
-                    <input name="NombreTitular" value={cuentaForm.NombreTitular} onChange={handleCuentaChange} placeholder="Titular" className="border border-gray-300 rounded px-3 py-2 text-sm" />
-                    <CatalogSelectField value={cuentaForm.Moneda} onChange={(value) => handleCuentaCatalogChange('Moneda', value)} options={monedaOptions} placeholder="Moneda" />
-                    <label className="flex items-center gap-2 text-sm text-gray-700 md:col-span-3">
-                      <input type="checkbox" name="EsPrincipal" checked={cuentaForm.EsPrincipal} onChange={handleCuentaChange} />
+                <div className="space-y-5">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#6b7a96]">Dispersión</p>
+                      <h4 className="mt-1 text-lg font-semibold text-slate-900">Cuentas bancarias</h4>
+                    </div>
+                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
+                      {cuentas.length} registradas
+                    </span>
+                  </div>
+                  <form onSubmit={guardarCuenta} className={`${premiumSectionClass} grid grid-cols-1 gap-3 md:grid-cols-3`}>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-600">Banco</label>
+                      <CatalogSelectField value={cuentaForm.Banco} onChange={(value) => handleCuentaCatalogChange('Banco', value)} options={bancoOptions} placeholder="Banco" />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-600">Numero de cuenta</label>
+                      <input name="NumeroCuenta" value={cuentaForm.NumeroCuenta} onChange={handleCuentaChange} placeholder="16 digitos" className={premiumFieldClass} />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-600">CLABE interbancaria</label>
+                      <input name="CLABE" value={cuentaForm.CLABE} onChange={handleCuentaChange} placeholder="18 digitos" className={premiumFieldClass} />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-600">Numero de tarjeta</label>
+                      <input name="NumeroTarjeta" value={cuentaForm.NumeroTarjeta} onChange={handleCuentaChange} placeholder="16 digitos" className={premiumFieldClass} />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-600">Nombre del titular</label>
+                      <input name="NombreTitular" value={cuentaForm.NombreTitular} onChange={handleCuentaChange} placeholder="Como aparece en la cuenta" className={premiumFieldClass} />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-600">Moneda</label>
+                      <CatalogSelectField value={cuentaForm.Moneda} onChange={(value) => handleCuentaCatalogChange('Moneda', value)} options={monedaOptions} placeholder="Moneda" />
+                    </div>
+                    <label className="flex items-center gap-3 rounded-2xl border border-[#d7e0ee] bg-slate-50/90 px-4 py-3 text-sm font-medium text-slate-700 md:col-span-3">
+                      <input type="checkbox" name="EsPrincipal" checked={cuentaForm.EsPrincipal} onChange={handleCuentaChange} className="h-4 w-4 rounded border-slate-300 text-[#17346f] focus:ring-[#17346f]" />
                       Cuenta principal
                     </label>
-                    <div className="md:col-span-3 flex gap-2">
-                      <button type="submit" disabled={savingCuenta} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400">
+                    <div className="md:col-span-3 flex flex-wrap gap-3">
+                      <button type="submit" disabled={savingCuenta} className={primaryButtonClass}>
                         {savingCuenta ? 'Guardando...' : editingCuentaId ? 'Actualizar cuenta' : 'Agregar cuenta'}
                       </button>
                       {editingCuentaId && (
-                        <button type="button" onClick={resetCuentaForm} className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400">
+                        <button type="button" onClick={resetCuentaForm} className={secondaryButtonClass}>
                           Cancelar edición
                         </button>
                       )}
                     </div>
                   </form>
 
-                  <div className="overflow-auto">
-                    <table className="w-full text-left text-sm border-collapse">
-                      <thead>
-                        <tr className="text-gray-600">
-                          <th className="py-2 pr-3">Banco</th>
-                          <th className="py-2 pr-3">Cuenta</th>
-                          <th className="py-2 pr-3">CLABE</th>
-                          <th className="py-2 pr-3">Principal</th>
-                          <th className="py-2 pr-3">Acciones</th>
+                  <div className={tableShellClass}>
+                    <div className="overflow-auto">
+                    <table className="w-full min-w-[760px] text-left text-sm border-collapse">
+                      <thead className="bg-slate-50/90 text-slate-500">
+                        <tr>
+                          <th className="px-5 py-4 font-semibold">Banco</th>
+                          <th className="px-5 py-4 font-semibold">Cuenta</th>
+                          <th className="px-5 py-4 font-semibold">CLABE</th>
+                          <th className="px-5 py-4 font-semibold">Principal</th>
+                          <th className="px-5 py-4 font-semibold">Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
                         {cuentas.map((c) => (
-                          <tr key={c.CuentaBancaria_Id} className="border-t border-gray-200">
-                            <td className="py-2 pr-3 text-gray-900">{c.Banco}</td>
-                            <td className="py-2 pr-3 text-gray-900">{c.NumeroCuenta}</td>
-                            <td className="py-2 pr-3 text-gray-900">{c.CLABE || '-'}</td>
-                            <td className="py-2 pr-3 text-gray-900">{c.EsPrincipal ? 'Sí' : 'No'}</td>
-                            <td className="py-2 pr-3">
-                              <div className="flex gap-2">
-                                <button type="button" onClick={() => startEditCuenta(c)} className="px-2 py-1 bg-gray-600 text-white rounded">Editar</button>
-                                <button type="button" onClick={() => eliminarCuenta(c.CuentaBancaria_Id)} className="px-2 py-1 bg-red-600 text-white rounded">Eliminar</button>
+                          <tr key={c.CuentaBancaria_Id} className="border-t border-slate-100 text-slate-700">
+                            <td className="px-5 py-4 font-medium text-slate-900">{c.Banco}</td>
+                            <td className="px-5 py-4 text-slate-700">{c.NumeroCuenta}</td>
+                            <td className="px-5 py-4 text-slate-700">{c.CLABE || '-'}</td>
+                            <td className="px-5 py-4 text-slate-700">
+                              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${c.EsPrincipal ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                {c.EsPrincipal ? 'Sí' : 'No'}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={() => startEditCuenta(c)} className={secondaryButtonClass}>Editar</button>
+                                <button type="button" onClick={() => eliminarCuenta(c.CuentaBancaria_Id)} className={subtleDangerButtonClass}>Eliminar</button>
                               </div>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                    {cuentas.length === 0 && <p className="text-sm text-gray-500 mt-2">Sin cuentas bancarias registradas.</p>}
+                    </div>
+                    {cuentas.length === 0 && <p className="px-5 py-6 text-sm text-slate-500">Sin cuentas bancarias registradas.</p>}
                   </div>
                 </div>
               )}
 
               {activeTab === 'documentos' && (
-                <div className="space-y-4">
-                  <form onSubmit={guardarDocumento} className="grid grid-cols-1 md:grid-cols-3 gap-3 border border-gray-200 rounded-lg p-3">
-                    <input
-                      name="TipoDocumento"
-                      value={documentoForm.TipoDocumento}
-                      onChange={handleDocumentoFieldChange}
-                      placeholder="Tipo de documento (INE, contrato, etc.)"
-                      className="border border-gray-300 rounded px-3 py-2 text-sm"
-                    />
-                    <input
-                      name="Descripcion"
-                      value={documentoForm.Descripcion}
-                      onChange={handleDocumentoFieldChange}
-                      placeholder="Descripción"
-                      className="border border-gray-300 rounded px-3 py-2 text-sm md:col-span-2"
-                    />
-                    <input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-                      onChange={handleDocumentoFileChange}
-                      className="border border-gray-300 rounded px-3 py-2 text-sm md:col-span-2"
-                    />
-                    <div className="text-xs text-gray-500 flex items-center">
+                <div className="space-y-5">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#6b7a96]">Resguardo digital</p>
+                      <h4 className="mt-1 text-lg font-semibold text-slate-900">Documentos del expediente</h4>
+                    </div>
+                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
+                      {documentos.length} cargados
+                    </span>
+                  </div>
+                  <form onSubmit={guardarDocumento} className={`${premiumSectionClass} grid grid-cols-1 gap-3 md:grid-cols-3`}>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-600">Tipo de documento</label>
+                      <input
+                        name="TipoDocumento"
+                        value={documentoForm.TipoDocumento}
+                        onChange={handleDocumentoFieldChange}
+                        placeholder="INE, contrato, constancia, etc."
+                        className={premiumFieldClass}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5 md:col-span-2">
+                      <label className="text-xs font-semibold text-slate-600">Descripción</label>
+                      <input
+                        name="Descripcion"
+                        value={documentoForm.Descripcion}
+                        onChange={handleDocumentoFieldChange}
+                        placeholder="Describe el contenido o vigencia"
+                        className={premiumFieldClass}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5 md:col-span-2">
+                      <label className="text-xs font-semibold text-slate-600">Archivo adjunto</label>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                        onChange={handleDocumentoFileChange}
+                        className={`${premiumFieldClass} file:mr-4 file:rounded-xl file:border-0 file:bg-[#17346f] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white`}
+                      />
+                    </div>
+                    <div className="flex items-end text-xs font-medium text-slate-500">
                       Formatos: PDF, JPG, PNG, WEBP, DOC, DOCX
                     </div>
-                    <div className="md:col-span-3 flex gap-2">
+                    <div className="md:col-span-3 flex flex-wrap gap-3 pt-1">
                       <button
                         type="submit"
                         disabled={uploadingDocumento}
-                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400"
+                        className={primaryButtonClass}
                       >
                         {uploadingDocumento ? 'Subiendo...' : 'Cargar documento'}
                       </button>
                     </div>
                   </form>
 
-                  <div className="overflow-auto">
-                    <table className="w-full text-left text-sm border-collapse">
-                      <thead>
-                        <tr className="text-gray-600">
-                          <th className="py-2 pr-3">Tipo</th>
-                          <th className="py-2 pr-3">Archivo</th>
-                          <th className="py-2 pr-3">Descripción</th>
-                          <th className="py-2 pr-3">Fecha</th>
-                          <th className="py-2 pr-3">Acciones</th>
+                  <div className={tableShellClass}>
+                    <div className="overflow-auto">
+                    <table className="w-full min-w-[860px] text-left text-sm border-collapse">
+                      <thead className="bg-slate-50/90 text-slate-500">
+                        <tr>
+                          <th className="px-5 py-4 font-semibold">Tipo</th>
+                          <th className="px-5 py-4 font-semibold">Archivo</th>
+                          <th className="px-5 py-4 font-semibold">Descripción</th>
+                          <th className="px-5 py-4 font-semibold">Fecha</th>
+                          <th className="px-5 py-4 font-semibold">Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
                         {documentos.map((d) => (
-                          <tr key={d.Documento_Id} className="border-t border-gray-200">
-                            <td className="py-2 pr-3 text-gray-900">{d.TipoDocumento || '-'}</td>
-                            <td className="py-2 pr-3 text-gray-900">
+                          <tr key={d.Documento_Id} className="border-t border-slate-100 text-slate-700">
+                            <td className="px-5 py-4 font-medium text-slate-900">{d.TipoDocumento || '-'}</td>
+                            <td className="px-5 py-4">
                               <a
                                 href={resolveDocumentoUrl(d.ArchivoUrl)}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="text-blue-700 hover:underline"
+                                className="font-medium text-[#17346f] hover:underline"
                               >
                                 {d.NombreArchivo || 'Ver documento'}
                               </a>
                             </td>
-                            <td className="py-2 pr-3 text-gray-900">{d.Descripcion || '-'}</td>
-                            <td className="py-2 pr-3 text-gray-900">{d.CreatedAt ? new Date(d.CreatedAt).toLocaleDateString('es-MX') : '-'}</td>
-                            <td className="py-2 pr-3">
+                            <td className="px-5 py-4 text-slate-700">{d.Descripcion || '-'}</td>
+                            <td className="px-5 py-4 text-slate-700">{d.CreatedAt ? new Date(d.CreatedAt).toLocaleDateString('es-MX') : '-'}</td>
+                            <td className="px-5 py-4">
                               <button
                                 type="button"
                                 onClick={() => eliminarDocumento(d.Documento_Id)}
-                                className="px-2 py-1 bg-red-600 text-white rounded"
+                                className={subtleDangerButtonClass}
                               >
                                 Eliminar
                               </button>
@@ -1245,11 +1613,14 @@ export default function RH() {
                         ))}
                       </tbody>
                     </table>
-                    {documentos.length === 0 && <p className="text-sm text-gray-500 mt-2">Sin documentos cargados.</p>}
+                    </div>
+                    {documentos.length === 0 && <p className="px-5 py-6 text-sm text-slate-500">Sin documentos cargados.</p>}
                   </div>
                 </div>
               )}
-              </>
+
+              </div>
+            </div>
             )}
           </div>
         </div>

@@ -1,46 +1,28 @@
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
-const getAuthHeader = () => {
-  const token = localStorage.getItem('token');
-  return { Authorization: `Bearer ${token}` };
-};
+import api from './api';
 
 export const cotizacionService = {
   createCotizacion: async (payload) => {
-    const response = await axios.post(`${API_URL}/cotizaciones`, payload, {
-      headers: getAuthHeader(),
-    });
+    const response = await api.post('/cotizaciones/', payload);
     return response.data;
   },
 
   listCotizaciones: async (filters = {}) => {
-    const response = await axios.get(`${API_URL}/cotizaciones`, {
-      headers: getAuthHeader(),
-      params: filters,
-    });
+    const response = await api.get('/cotizaciones/', { params: filters });
     return response.data;
   },
 
   getCotizacion: async (id) => {
-    const response = await axios.get(`${API_URL}/cotizaciones/${id}`, {
-      headers: getAuthHeader(),
-    });
+    const response = await api.get(`/cotizaciones/${id}`);
     return response.data;
   },
 
   aprobarCotizacion: async (id, payload = {}) => {
-    const response = await axios.post(`${API_URL}/cotizaciones/${id}/aprobar`, payload, {
-      headers: getAuthHeader(),
-    });
+    const response = await api.post(`/cotizaciones/${id}/aprobar`, payload);
     return response.data;
   },
 
   confirmarPedido: async (id) => {
-    const response = await axios.post(`${API_URL}/cotizaciones/${id}/confirmar-pedido`, {}, {
-      headers: getAuthHeader(),
-    });
+    const response = await api.post(`/cotizaciones/${id}/confirmar-pedido`, {});
     return response.data;
   },
 };

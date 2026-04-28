@@ -154,6 +154,177 @@ exports.getStockByProducto = async (req, res) => {
   }
 };
 
+const TIPOS_MAQUINA_VALIDOS = ['CORTE', 'TUBOS', 'ESQUINEROS', 'CONOS'];
+
+async function ensureMateriaPrimaMaquinaTable() {
+  await pool.request().query(`
+    IF OBJECT_ID('dbo.ERP_MP_MAQUINA_DIARIO', 'U') IS NULL
+    BEGIN
+      CREATE TABLE dbo.ERP_MP_MAQUINA_DIARIO (
+        Registro_Id INT IDENTITY(1,1) PRIMARY KEY,
+        FechaRegistro DATE NOT NULL,
+        TipoMaquina VARCHAR(30) NOT NULL,
+        MateriaPrima_Id INT NOT NULL,
+        Company_Id INT NOT NULL,
+        Almacen_Id INT NULL,
+        Cantidad DECIMAL(18,2) NOT NULL DEFAULT 0,
+        Observaciones NVARCHAR(500) NULL,
+        CreadoPor VARCHAR(100) NULL,
+        FechaCreacion DATETIME NOT NULL DEFAULT GETDATE(),
+        ActualizadoPor VARCHAR(100) NULL,
+        FechaActualizacion DATETIME NULL
+      );
+      CREATE INDEX IX_ERP_MP_MAQUINA_DIARIO_FECHA ON dbo.ERP_MP_MAQUINA_DIARIO (FechaRegistro, TipoMaquina, Company_Id);
+    END
+  `);
+}
+
+async function getPTCCompany() {
+  const result = await pool.request().query(`
+    SELECT TOP 1 Company_Id, NameCompany
+    FROM ERP_COMPANY
+    WHERE NameCompany LIKE '%PTC%'
+       OR NameCompany LIKE '%REMA%'
+    ORDER BY CASE WHEN NameCompany LIKE '%PTC%' THEN 0 ELSE 1 END, Company_Id
+  `);
+
+  if (!result.recordset?.length) {
+    throw new Error('No se encontró la empresa productora PTC/REMA');
+  }
+
+  return result.recordset[0];
+}
+
+exports.listMateriaPrimaPorMaquina = async (req, res) => {
+  try {
+    await ensureMateriaPrimaMaquinaTable();
+
+    const { fecha, tipo_maquina } = req.query || {};
+    const selectedDate = fecha || new Date().toISOString().slice(0, 10);
+    const ptcCompany = await getPTCCompany();
+
+    if (!req.isAdmin && req.userCompanies?.length && !req.userCompanies.includes(Number(ptcCompany.Company_Id))) {
+      return res.json({ data: [] });
+    }
+
+    let query = `
+      SELECT
+        d.Registro_Id,
+        d.FechaRegistro,
+        d.TipoMaquina,
+        d.MateriaPrima_Id,
+        d.Company_Id,
+        d.Almacen_Id,
+        d.Cantidad,
+        d.Observaciones,
+        d.CreadoPor,
+        d.FechaCreacion,
+        mp.Codigo AS SKU,
+        mp.Nombre AS NombreMaterial,
+        mp.UnidadCompra,
+        c.NameCompany,
+        a.Nombre AS NombreAlmacen
+      FROM ERP_MP_MAQUINA_DIARIO d
+      INNER JOIN ERP_MATERIA_PRIMA mp ON mp.MateriaPrima_Id = d.MateriaPrima_Id
+      INNER JOIN ERP_COMPANY c ON c.Company_Id = d.Company_Id
+      LEFT JOIN ERP_ALMACENES a ON a.Almacen_Id = d.Almacen_Id
+      WHERE d.FechaRegistro = @FechaRegistro
+        AND d.Company_Id = @Company_Id
+    `;
+
+    const request = pool.request();
+    request.input('FechaRegistro', sql.Date, selectedDate);
+    request.input('Company_Id', sql.Int, Number(ptcCompany.Company_Id));
+
+    if (tipo_maquina && tipo_maquina !== 'all') {
+      query += ' AND d.TipoMaquina = @TipoMaquina';
+      request.input('TipoMaquina', sql.VarChar(30), String(tipo_maquina).toUpperCase());
+    }
+
+    query += ' ORDER BY d.TipoMaquina, mp.Nombre, d.Registro_Id DESC';
+    const result = await request.query(query);
+    return res.json({ data: result.recordset || [], company: ptcCompany });
+  } catch (err) {
+    console.error('inventario.listMateriaPrimaPorMaquina error', err);
+    return res.status(500).json({ msg: 'Error al obtener el ingreso diario por máquina', error: err.message });
+  }
+};
+
+exports.saveMateriaPrimaPorMaquina = async (req, res) => {
+  try {
+    await ensureMateriaPrimaMaquinaTable();
+
+    const { FechaRegistro, TipoMaquina, MateriaPrima_Id, Almacen_Id, Cantidad, Observaciones } = req.body || {};
+
+    if (!FechaRegistro || !TipoMaquina || !MateriaPrima_Id || Cantidad === undefined) {
+      return res.status(400).json({ msg: 'Campos requeridos: FechaRegistro, TipoMaquina, MateriaPrima_Id, Cantidad' });
+    }
+
+    const tipoNormalizado = String(TipoMaquina).toUpperCase();
+    if (!TIPOS_MAQUINA_VALIDOS.includes(tipoNormalizado)) {
+      return res.status(400).json({ msg: `TipoMaquina inválido. Use: ${TIPOS_MAQUINA_VALIDOS.join(', ')}` });
+    }
+
+    const ptcCompany = await getPTCCompany();
+    if (!req.isAdmin && req.userCompanies?.length && !req.userCompanies.includes(Number(ptcCompany.Company_Id))) {
+      return res.status(403).json({ msg: 'No tiene permisos para registrar materiales en PTC/REMA' });
+    }
+
+    const request = pool.request();
+    request
+      .input('FechaRegistro', sql.Date, FechaRegistro)
+      .input('TipoMaquina', sql.VarChar(30), tipoNormalizado)
+      .input('MateriaPrima_Id', sql.Int, Number(MateriaPrima_Id))
+      .input('Company_Id', sql.Int, Number(ptcCompany.Company_Id))
+      .input('Almacen_Id', sql.Int, Almacen_Id ? Number(Almacen_Id) : null)
+      .input('Cantidad', sql.Decimal(18, 2), Number(Cantidad || 0))
+      .input('Observaciones', sql.NVarChar(500), Observaciones || null)
+      .input('Usuario', sql.VarChar(100), req.user?.Username || req.user?.Email || 'sistema');
+
+    const result = await request.query(`
+      IF EXISTS (
+        SELECT 1
+        FROM ERP_MP_MAQUINA_DIARIO
+        WHERE FechaRegistro = @FechaRegistro
+          AND TipoMaquina = @TipoMaquina
+          AND MateriaPrima_Id = @MateriaPrima_Id
+          AND Company_Id = @Company_Id
+          AND ISNULL(Almacen_Id, 0) = ISNULL(@Almacen_Id, 0)
+      )
+      BEGIN
+        UPDATE ERP_MP_MAQUINA_DIARIO
+        SET Cantidad = @Cantidad,
+            Observaciones = @Observaciones,
+            ActualizadoPor = @Usuario,
+            FechaActualizacion = GETDATE()
+        OUTPUT INSERTED.*
+        WHERE FechaRegistro = @FechaRegistro
+          AND TipoMaquina = @TipoMaquina
+          AND MateriaPrima_Id = @MateriaPrima_Id
+          AND Company_Id = @Company_Id
+          AND ISNULL(Almacen_Id, 0) = ISNULL(@Almacen_Id, 0)
+      END
+      ELSE
+      BEGIN
+        INSERT INTO ERP_MP_MAQUINA_DIARIO (
+          FechaRegistro, TipoMaquina, MateriaPrima_Id, Company_Id, Almacen_Id,
+          Cantidad, Observaciones, CreadoPor
+        )
+        OUTPUT INSERTED.*
+        VALUES (
+          @FechaRegistro, @TipoMaquina, @MateriaPrima_Id, @Company_Id, @Almacen_Id,
+          @Cantidad, @Observaciones, @Usuario
+        )
+      END
+    `);
+
+    return res.status(201).json({ msg: 'Ingreso diario por máquina guardado correctamente', data: result.recordset?.[0] || null, company: ptcCompany });
+  } catch (err) {
+    console.error('inventario.saveMateriaPrimaPorMaquina error', err);
+    return res.status(500).json({ msg: 'Error al guardar ingreso diario por máquina', error: err.message });
+  }
+};
+
 // GET /api/inventario/consolidado - inventario total por producto/empresa con estados operativos
 exports.listConsolidado = async (req, res) => {
   try {

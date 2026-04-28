@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/c/Users/diazj/OneDrive/Escritorio/ERP_PROYECTO/erp_zoro_python/app/**)",
+      "Bash(python -m compileall app/services/email_service.py app/services/password_service.py app/services/constancia_service.py app/services/client_pricing_service.py app/api/routes/password.py app/api/routes/constancia.py app/api/routes/client_pricing.py app/api/routes/cp.py app/api/router.py)"
+    ]
+  }
+}

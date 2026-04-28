@@ -16,6 +16,7 @@ router.get('/:id/factura/pdf', ventaController.getFacturaPDFUrl);
 router.put('/:id', ventaController.updateVenta);
 router.delete('/:id', ventaController.deleteVenta);
 router.post('/:id/productos', ventaController.addProductosVenta);
+router.put('/:id/confirmar', ventaController.confirmarVenta);
 router.post('/:id/facturar', ventaController.facturarVenta);
 router.put('/:id/cancelar', ventaController.cancelarVenta);
 

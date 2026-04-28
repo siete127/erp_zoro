@@ -6,12 +6,12 @@ Sistema de permisos que permite al superadmin controlar el acceso a módulos esp
 ## Instalación
 
 ### 1. Ejecutar SQL
-Ejecuta el archivo `backend/sql/permisos_schema.sql` en SQL Server Management Studio para crear las tablas necesarias.
+Ejecuta el archivo `erp_zoro_python/sql/legacy_node_sql/permisos_schema.sql` en SQL Server Management Studio para crear las tablas necesarias.
 
 ### 2. Reiniciar Backend
 ```bash
-cd backend
-node server.js
+cd erp_zoro_python
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## Estructura

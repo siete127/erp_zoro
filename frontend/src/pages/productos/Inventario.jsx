@@ -3,6 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { notify } from '../../services/notify';
 import { socket } from '../../services/socket';
+import {
+  operationContainerClass,
+  operationPageClass,
+  operationSecondaryButtonClass,
+  operationTableShellClass,
+  OperationHeader,
+  OperationStat,
+} from '../../components/operation/OperationUI';
 
 const CLASIFICACION_LABELS = {
   MATERIA_PRIMA:      { label: 'Materia Prima',    color: 'bg-yellow-100 text-yellow-800 border border-yellow-300' },
@@ -11,7 +19,7 @@ const CLASIFICACION_LABELS = {
 };
 
 function ClasificacionBadge({ value }) {
-  const cfg = CLASIFICACION_LABELS[value] || { label: value || '—', color: 'bg-gray-100 text-gray-500 border border-gray-200' };
+  const cfg = CLASIFICACION_LABELS[value] || { label: value || '-', color: 'bg-gray-100 text-gray-500 border border-gray-200' };
   return (
     <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${cfg.color}`}>
       {cfg.label}
@@ -63,10 +71,12 @@ function StatCard({ label, value, icon, color, alert, loading }) {
 }
 
 const TABS = [
-  { id: 'stock',       label: 'Stock por Almacén',  icon: '🏭' },
-  { id: 'consolidado', label: 'Estado Consolidado', icon: '📊' },
-  { id: 'mp',          label: 'Materia Prima',      icon: '🧱' },
+  { id: 'stock',       label: 'Stock por Almacen',  icon: 'ALM' },
+  { id: 'consolidado', label: 'Estado consolidado', icon: 'CON' },
+  { id: 'mp',          label: 'Materia prima',      icon: 'MP' },
 ];
+
+const MACHINE_TYPES = ['CORTE', 'TUBOS', 'ESQUINEROS', 'CONOS'];
 
 export default function Inventario() {
   const navigate = useNavigate();
@@ -91,6 +101,21 @@ export default function Inventario() {
   const [filtrosMP, setFiltrosMP] = useState({ search: '', company_id: 'all' });
   const [editMP, setEditMP] = useState(null);
   const [savingMP, setSavingMP] = useState(false);
+  const [machineEntries, setMachineEntries] = useState([]);
+  const [loadingMachineEntries, setLoadingMachineEntries] = useState(false);
+  const [showMachineModal, setShowMachineModal] = useState(false);
+  const [savingMachineEntry, setSavingMachineEntry] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
+  const [machineFilters, setMachineFilters] = useState({ fecha: today, tipo_maquina: 'all' });
+  const [productionCompany, setProductionCompany] = useState(null);
+  const [machineForm, setMachineForm] = useState({
+    FechaRegistro: today,
+    TipoMaquina: 'CORTE',
+    Almacen_Id: '',
+    MateriaPrima_Id: '',
+    Cantidad: '',
+    Observaciones: '',
+  });
 
   // ── Shared ────────────────────────────────────────────────────────────────
   const [companies, setCompanies] = useState([]);
@@ -146,20 +171,39 @@ export default function Inventario() {
     }
   }, [filtrosMP]);
 
+  const fetchMachineEntries = useCallback(async () => {
+    setLoadingMachineEntries(true);
+    try {
+      const params = new URLSearchParams();
+      if (machineFilters.fecha) params.append('fecha', machineFilters.fecha);
+      if (machineFilters.tipo_maquina !== 'all') params.append('tipo_maquina', machineFilters.tipo_maquina);
+      const res = await api.get(`/inventario/mp/maquinas?${params}`);
+      setMachineEntries(res.data?.data || []);
+      setProductionCompany(res.data?.company || null);
+    } catch (err) {
+      notify(err.response?.data?.msg || 'Error cargando ingresos diarios por maquina', 'error');
+    } finally {
+      setLoadingMachineEntries(false);
+    }
+  }, [machineFilters]);
+
   useEffect(() => {
     if (tab === 'stock') fetchStock();
     if (tab === 'consolidado') fetchConsolidado();
     if (tab === 'mp') fetchStockMP();
-  }, [tab]);
+    if (tab === 'mp') fetchMachineEntries();
+  }, [tab, fetchStock, fetchConsolidado, fetchStockMP, fetchMachineEntries]);
 
   useEffect(() => {
     const fetchCompanies = async () => {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      setUserRole(user.RolId);
       try {
-        const res = await api.get('/companies');
+        const res = await api.get('/companies/');
         setCompanies(res.data || []);
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        setUserRole(user.RolId);
-      } catch {}
+      } catch {
+        setCompanies([]);
+      }
     };
     fetchCompanies();
   }, []);
@@ -187,8 +231,6 @@ export default function Inventario() {
         Company_Id:                  editRow.Company_Id,
         Almacen_Id:                  editRow.Almacen_Id,
         CantidadEnMaquina:           Number(editRow.CantidadEnMaquina)           || 0,
-        CantidadEntregadaProduccion: Number(editRow.CantidadEntregadaProduccion) || 0,
-        CantidadEnProceso:           Number(editRow.CantidadEnProceso)           || 0,
       });
       notify('Estado actualizado', 'success');
       setEditRow(null);
@@ -210,7 +252,7 @@ export default function Inventario() {
         Almacen_Id:      editMP.Almacen_Id,
         StockMinimo:     Number(editMP.StockMinimo) || 0,
       });
-      notify('Stock mínimo actualizado', 'success');
+      notify('Stock minimo actualizado', 'success');
       setEditMP(null);
       fetchStockMP();
     } catch (err) {
@@ -220,33 +262,91 @@ export default function Inventario() {
     }
   };
 
+  const handleOpenMachineModal = () => {
+    setMachineForm({
+      FechaRegistro: machineFilters.fecha || today,
+      TipoMaquina: 'CORTE',
+      Almacen_Id: '',
+      MateriaPrima_Id: '',
+      Cantidad: '',
+      Observaciones: '',
+    });
+    setShowMachineModal(true);
+  };
+
+  const handleSaveMachineEntry = async () => {
+    if (!machineForm.MateriaPrima_Id || !machineForm.Cantidad) {
+      notify('Completa material y cantidad', 'error');
+      return;
+    }
+
+    setSavingMachineEntry(true);
+    try {
+      await api.post('/inventario/mp/maquinas', {
+        FechaRegistro: machineForm.FechaRegistro,
+        TipoMaquina: machineForm.TipoMaquina,
+        Almacen_Id: machineForm.Almacen_Id ? Number(machineForm.Almacen_Id) : null,
+        MateriaPrima_Id: Number(machineForm.MateriaPrima_Id),
+        Cantidad: Number(machineForm.Cantidad),
+        Observaciones: machineForm.Observaciones,
+      });
+      notify('Ingreso diario por maquina guardado', 'success');
+      setShowMachineModal(false);
+      fetchMachineEntries();
+    } catch (err) {
+      notify(err.response?.data?.msg || 'Error al guardar ingreso por maquina', 'error');
+    } finally {
+      setSavingMachineEntry(false);
+    }
+  };
+
+  const materialesDisponibles = stockMP.filter((row) => {
+    if (productionCompany?.Company_Id && Number(row.Company_Id) !== Number(productionCompany.Company_Id)) return false;
+    return true;
+  });
+
+  const almacenesDisponibles = materialesDisponibles
+    .filter((row) => Number(row.MateriaPrima_Id) === Number(machineForm.MateriaPrima_Id))
+    .map((row) => ({ Almacen_Id: row.Almacen_Id, NombreAlmacen: row.NombreAlmacen }));
+
 
   // ── Stats para tab stock ──────────────────────────────────────────────────
   const totalSKUs     = new Set(items.map(i => i.SKU)).size;
   const totalUnidades = items.reduce((a, i) => a + (Number(i.Cantidad) || 0), 0);
   const bajoStock     = items.filter(i => Number(i.Cantidad) < Number(i.Stock_Minimo)).length;
   const totalAlmacenes = new Set(items.map(i => i.Almacen_Id).filter(Boolean)).size;
+  const showLegacyStats = false;
 
   return (
-    <div className="w-full space-y-5">
+    <div className={operationPageClass}>
+      <div className={operationContainerClass}>
 
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-bold text-[#092052]">Inventario</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Stock por almacén y estado operacional de productos</p>
-        </div>
-        <button
-          onClick={() => navigate('/productos/recepcion-pendiente')}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700
-                     text-white rounded-xl text-sm font-semibold shadow-sm transition-colors"
-        >
-          📦 Recepciones pendientes
-        </button>
-      </div>
+      <OperationHeader
+        eyebrow="Operacion"
+        title="Inventario"
+        description="Controla stock por almacen, estado consolidado y materia prima operativa desde una sola vista premium."
+        actions={
+          <button
+            onClick={() => navigate('/productos/recepcion-pendiente')}
+            className={operationSecondaryButtonClass}
+          >
+            Recepciones pendientes
+          </button>
+        }
+        stats={
+          <>
+            <OperationStat label="SKUs totales" value={loadingStock ? '...' : totalSKUs} tone="blue" />
+            <OperationStat label="Unidades en stock" value={loadingStock ? '...' : totalUnidades.toLocaleString('es-MX')} tone="emerald" />
+            <OperationStat label="Almacenes activos" value={loadingStock ? '...' : totalAlmacenes} tone="slate" />
+            <OperationStat label="Bajo stock" value={loadingStock ? '...' : bajoStock} tone="rose" />
+          </>
+        }
+      />
+      
 
       {/* ── Stat Cards (solo en tab stock) ── */}
-      {tab === 'stock' && (
+      {showLegacyStats && tab === 'stock' && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <StatCard label="SKUs totales"      value={totalSKUs}                              color="blue"   icon="🏷️" loading={loadingStock} />
           <StatCard label="Unidades en stock" value={totalUnidades.toLocaleString('es-MX')} color="green"  icon="📦" loading={loadingStock} />
@@ -256,10 +356,10 @@ export default function Inventario() {
       )}
 
       {/* ── Panel principal ── */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
+      <div className={operationTableShellClass}>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-200 px-4">
+        <div className="flex border-b border-slate-200/80 px-4">
           {TABS.map(t => (
             <button
               key={t.id}
@@ -270,7 +370,7 @@ export default function Inventario() {
                   : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
                 }`}
             >
-              <span>{t.icon}</span>
+              <span className="inline-flex min-w-[2.25rem] items-center justify-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold tracking-[0.18em] text-slate-500">{t.icon}</span>
               {t.label}
             </button>
           ))}
@@ -293,7 +393,7 @@ export default function Inventario() {
                     className="h-9 px-3 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm
                                focus:outline-none focus:ring-2 focus:ring-[#092052]/30 focus:border-[#092052]"
                   >
-                    <option value="all">🏢 Todas las empresas</option>
+                    <option value="all">Todas las empresas</option>
                     {companies.map(c => <option key={c.Company_Id} value={c.Company_Id}>{c.NameCompany}</option>)}
                   </select>
                 )}
@@ -422,7 +522,7 @@ export default function Inventario() {
                     className="h-9 px-3 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm
                                focus:outline-none focus:ring-2 focus:ring-[#092052]/30 focus:border-[#092052]"
                   >
-                    <option value="all">🏢 Todas las empresas</option>
+                    <option value="all">Todas las empresas</option>
                     {companies.map(c => <option key={c.Company_Id} value={c.Company_Id}>{c.NameCompany}</option>)}
                   </select>
                 )}
@@ -432,7 +532,7 @@ export default function Inventario() {
                   className="h-9 px-3 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm
                              focus:outline-none focus:ring-2 focus:ring-[#092052]/30 focus:border-[#092052]"
                 >
-                  <option value="all">🗂 Todas las clasificaciones</option>
+                    <option value="all">Todas las clasificaciones</option>
                   <option value="MATERIA_PRIMA">Materia Prima</option>
                   <option value="PRODUCTO_TERMINADO">Producto Terminado</option>
                   <option value="PRODUCTO_REVENTA">Producto de Reventa</option>
@@ -462,8 +562,6 @@ export default function Inventario() {
                 {[
                   { color: 'bg-gray-100 border-gray-300',     icon: '📦', label: 'En Almacén (stock físico)' },
                   { color: 'bg-blue-100 border-blue-300',     icon: '⚙️', label: 'En Máquina' },
-                  { color: 'bg-purple-100 border-purple-300', icon: '🔧', label: 'Entregada a Producción' },
-                  { color: 'bg-orange-100 border-orange-300', icon: '🔄', label: 'En Proceso' },
                 ].map(l => (
                   <span key={l.label} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${l.color}`}>
                     {l.icon} {l.label}
@@ -482,18 +580,16 @@ export default function Inventario() {
                       <th className="py-3 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-36">Clasificación</th>
                       <th className="py-3 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-28 text-right bg-gray-100/80">En Almacén</th>
                       <th className="py-3 pr-3 text-xs font-semibold text-blue-600 uppercase tracking-wide w-28 text-right bg-blue-50">En Máquina</th>
-                      <th className="py-3 pr-3 text-xs font-semibold text-purple-600 uppercase tracking-wide w-32 text-right bg-purple-50">Entregada Prod.</th>
-                      <th className="py-3 pr-3 text-xs font-semibold text-orange-600 uppercase tracking-wide w-28 text-right bg-orange-50">En Proceso</th>
                       <th className="py-3 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-16 text-center">Acción</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loadingCons
-                      ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={9} />)
+                      ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={7} />)
                       : consolidado.length === 0
                         ? (
                           <tr>
-                            <td colSpan={9} className="py-12 text-center">
+                            <td colSpan={7} className="py-12 text-center">
                               <div className="flex flex-col items-center gap-2 text-gray-400">
                                 <span className="text-4xl">📊</span>
                                 <p className="text-sm font-medium">Sin datos de estado consolidado.</p>
@@ -520,12 +616,6 @@ export default function Inventario() {
                             </td>
                             <td className="py-3 pr-3 text-right bg-blue-50 whitespace-nowrap text-blue-800">
                               <Num value={row.CantidadEnMaquina} warn />
-                            </td>
-                            <td className="py-3 pr-3 text-right bg-purple-50 whitespace-nowrap text-purple-800">
-                              <Num value={row.CantidadEntregadaProduccion} warn />
-                            </td>
-                            <td className="py-3 pr-3 text-right bg-orange-50 whitespace-nowrap text-orange-800">
-                              <Num value={row.CantidadEnProceso} warn />
                             </td>
                             <td className="py-3 pr-3 text-center">
                               <button
@@ -586,7 +676,86 @@ export default function Inventario() {
                 >
                   Buscar
                 </button>
+                <button
+                  type="button"
+                  onClick={handleOpenMachineModal}
+                  className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  + Ingreso diario por máquina
+                </button>
               </form>
+
+              <div className="rounded-xl border border-gray-200 p-4 mb-5 bg-white">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
+                  <div>
+                    <h3 className="text-base font-bold text-gray-900">Ingreso diario por máquina</h3>
+                    <p className="text-xs text-gray-500">Captura diaria para `CORTE`, `TUBOS`, `ESQUINEROS` y `CONOS`.</p>
+                    {productionCompany && (
+                      <p className="text-xs text-blue-600 mt-1 font-medium">Empresa productora: {productionCompany.NameCompany}</p>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      type="date"
+                      value={machineFilters.fecha}
+                      onChange={(e) => setMachineFilters({ ...machineFilters, fecha: e.target.value })}
+                      className="h-9 px-3 rounded-lg border border-gray-300 bg-white text-sm"
+                    />
+                    <select
+                      value={machineFilters.tipo_maquina}
+                      onChange={(e) => setMachineFilters({ ...machineFilters, tipo_maquina: e.target.value })}
+                      className="h-9 px-3 rounded-lg border border-gray-300 bg-white text-sm"
+                    >
+                      <option value="all">Todas las máquinas</option>
+                      {MACHINE_TYPES.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={fetchMachineEntries}
+                      className="h-9 px-4 bg-[#092052] hover:bg-[#0d3a7a] text-white rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Consultar
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-auto rounded-xl border border-gray-200">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="py-3 pl-4 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Fecha</th>
+                        <th className="py-3 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Máquina</th>
+                        <th className="py-3 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Material</th>
+                        <th className="py-3 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Empresa</th>
+                        <th className="py-3 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Almacén</th>
+                        <th className="py-3 pr-3 text-xs font-semibold text-emerald-600 uppercase tracking-wide text-right">Cantidad</th>
+                        <th className="py-3 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Observaciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loadingMachineEntries
+                        ? Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={7} />)
+                        : machineEntries.length === 0
+                          ? (
+                            <tr>
+                              <td colSpan={7} className="py-8 text-center text-sm text-gray-400">Sin registros para la fecha seleccionada.</td>
+                            </tr>
+                          )
+                          : machineEntries.map((row) => (
+                            <tr key={row.Registro_Id} className="border-t border-gray-100 hover:bg-emerald-50/30">
+                              <td className="py-3 pl-4 pr-3 text-xs text-gray-600 whitespace-nowrap">{String(row.FechaRegistro).slice(0, 10)}</td>
+                              <td className="py-3 pr-3"><span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800 border border-blue-200">{row.TipoMaquina}</span></td>
+                              <td className="py-3 pr-3 font-medium text-gray-900">{row.SKU} · {row.NombreMaterial}</td>
+                              <td className="py-3 pr-3 text-xs text-gray-500">{row.NameCompany || '—'}</td>
+                              <td className="py-3 pr-3 text-xs text-gray-500">{row.NombreAlmacen || '—'}</td>
+                              <td className="py-3 pr-3 text-right font-bold text-emerald-700"><Num value={row.Cantidad} /></td>
+                              <td className="py-3 pr-3 text-xs text-gray-500">{row.Observaciones || '—'}</td>
+                            </tr>
+                          ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
               {/* Tabla */}
               <div className="overflow-auto rounded-xl border border-gray-200">
@@ -764,9 +933,7 @@ export default function Inventario() {
             {/* Fields */}
             <div className="px-6 py-5 space-y-4">
               {[
-                { field: 'CantidadEnMaquina',           label: 'En Máquina',             icon: '⚙️', ring: 'focus:ring-blue-400',   labelColor: 'text-blue-700',   bg: 'bg-blue-50' },
-                { field: 'CantidadEntregadaProduccion', label: 'Entregada a Producción', icon: '🔧', ring: 'focus:ring-purple-400', labelColor: 'text-purple-700', bg: 'bg-purple-50' },
-                { field: 'CantidadEnProceso',           label: 'En Proceso',             icon: '🔄', ring: 'focus:ring-orange-400', labelColor: 'text-orange-700', bg: 'bg-orange-50' },
+                { field: 'CantidadEnMaquina', label: 'En Máquina', icon: '⚙️', ring: 'focus:ring-blue-400', labelColor: 'text-blue-700', bg: 'bg-blue-50' },
               ].map(({ field, label, icon, ring, labelColor, bg }) => (
                 <div key={field} className={`rounded-xl p-3 ${bg}`}>
                   <label className={`block text-xs font-semibold mb-1.5 ${labelColor}`}>
@@ -805,6 +972,67 @@ export default function Inventario() {
           </div>
         </div>
       )}
+
+      {showMachineModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 bg-[#092052]">
+              <div>
+                <h3 className="text-base font-bold text-white">Ingreso diario por máquina</h3>
+                <p className="text-xs text-blue-200 mt-0.5">Registra material para `CORTE`, `TUBOS`, `ESQUINEROS` o `CONOS`</p>
+              </div>
+              <button onClick={() => setShowMachineModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white text-lg transition-colors">×</button>
+            </div>
+
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 text-gray-700">Fecha</label>
+                <input type="date" value={machineForm.FechaRegistro} onChange={(e) => setMachineForm({ ...machineForm, FechaRegistro: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 text-gray-700">Máquina</label>
+                <select value={machineForm.TipoMaquina} onChange={(e) => setMachineForm({ ...machineForm, TipoMaquina: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm">
+                  {MACHINE_TYPES.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 text-gray-700">Material</label>
+                <select value={machineForm.MateriaPrima_Id} onChange={(e) => setMachineForm({ ...machineForm, MateriaPrima_Id: e.target.value, Almacen_Id: '' })} className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm">
+                  <option value="">Selecciona material</option>
+                  {materialesDisponibles.map(row => (
+                    <option key={`${row.MateriaPrima_Id}-${row.Almacen_Id}`} value={row.MateriaPrima_Id}>{row.SKU} · {row.NombreProducto}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 text-gray-700">Almacén</label>
+                <select value={machineForm.Almacen_Id} onChange={(e) => setMachineForm({ ...machineForm, Almacen_Id: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm">
+                  <option value="">Sin almacén / automático</option>
+                  {almacenesDisponibles.map(row => (
+                    <option key={row.Almacen_Id} value={row.Almacen_Id}>{row.NombreAlmacen}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 text-gray-700">Cantidad</label>
+                <input type="number" min="0" step="0.01" value={machineForm.Cantidad} onChange={(e) => setMachineForm({ ...machineForm, Cantidad: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold mb-1.5 text-gray-700">Observaciones</label>
+                <textarea value={machineForm.Observaciones} onChange={(e) => setMachineForm({ ...machineForm, Observaciones: e.target.value })} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm" placeholder="Notas opcionales" />
+              </div>
+            </div>
+
+            <div className="flex gap-2 px-6 py-4 border-t border-gray-100 justify-end bg-gray-50">
+              <button onClick={() => setShowMachineModal(false)} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-medium transition-colors">Cancelar</button>
+              <button onClick={handleSaveMachineEntry} disabled={savingMachineEntry} className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-semibold disabled:opacity-60 transition-colors">
+                {savingMachineEntry ? '⏳ Guardando...' : '✔ Guardar ingreso'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
     </div>
   );
 }

@@ -7,7 +7,7 @@ import ClienteSelector from "./ventas/ClienteSelector";
 import ProductoBuscador from "./ventas/ProductoBuscador";
 import TablaProductos from "./ventas/TablaProductos";
 import MultiProductPriceChangeModal from "../components/MultiProductPriceChangeModal";
-import axios from "axios";
+import api from "../services/api";
 import io from "socket.io-client";
 import { getSocketUrl } from "../services/socketConfig";
 
@@ -90,10 +90,7 @@ function NuevaVenta() {
 
   const verificarSolicitudesPendientes = async (ventaId) => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get('/api/client-pricing/price-change-requests/pending', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await api.get('/client-pricing/price-change-requests/pending');
       const allPending = res.data.data;
       
       // Buscar solicitudes relacionadas con esta venta
@@ -122,10 +119,8 @@ function NuevaVenta() {
     console.log('📋 Iniciando polling del estado de la solicitud...');
     const pollInterval = setInterval(async () => {
       try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get(
-          `/api/client-pricing/price-change-request/${priceChangeRequest.requestId}/status`,
-          { headers: { Authorization: `Bearer ${token}` } }
+        const response = await api.get(
+          `/client-pricing/price-change-request/${priceChangeRequest.requestId}/status`
         );
         
         if (response.data.success) {
@@ -226,10 +221,7 @@ function NuevaVenta() {
     if (!priceChangeRequest) return;
     
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get('/api/client-pricing/price-change-requests/pending', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await api.get('/client-pricing/price-change-requests/pending');
       const allPending = res.data.data;
       const updated = allPending.find(p => p.Request_Id === priceChangeRequest.requestId);
       
@@ -255,10 +247,7 @@ function NuevaVenta() {
 
   const fetchRecurringProducts = async (clientId) => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`/api/clients/${clientId}/recurring-products`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await api.get(`/clients/${clientId}/recurring-products`);
       setRecurringProducts(res.data?.data || []);
     } catch (error) {
       console.error('Error al cargar productos recurrentes:', error);
@@ -300,11 +289,7 @@ function NuevaVenta() {
       return;
     }
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(`/api/clients/${cliente.Client_Id}/recurring-products`, 
-        { Producto_Id: productoId },
-        { headers: { Authorization: `Bearer ${token}` }}
-      );
+      await api.post(`/clients/${cliente.Client_Id}/recurring-products`, { Producto_Id: productoId });
       notify('Producto agregado a recurrentes', 'success');
       await fetchRecurringProducts(cliente.Client_Id);
     } catch (error) {
@@ -426,16 +411,22 @@ function NuevaVenta() {
   };
 
   return (
-    <div className="w-full h-screen bg-white rounded-none shadow-none p-6 overflow-auto">
-      <div className="flex items-center justify-between mb-4">
+    <div
+      className="min-h-screen w-full px-4 sm:px-6 py-6"
+      style={{ background: "radial-gradient(ellipse at 70% 0%, rgba(59,107,212,0.07) 0%, rgba(255,255,255,0) 60%), radial-gradient(ellipse at 0% 80%, rgba(99,102,241,0.05) 0%, rgba(255,255,255,0) 55%), #f4f6fb" }}
+    >
+      <div className="mx-auto max-w-7xl space-y-5">
+
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            {isEditMode ? 'Editar venta pendiente' : 'Nueva venta'}
-          </h2>
-          <p className="text-sm text-gray-600">
-            {isEditMode 
-              ? 'Revisa el estado de las aprobaciones de precio y completa la venta' 
-              : 'Captura de cliente y productos para generar una nueva venta.'}
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#3b6fd4]">Ventas</p>
+          <h1 className="text-2xl font-bold text-[#0d1f3c]">
+            {isEditMode ? "Editar venta pendiente" : "Nueva venta"}
+          </h1>
+          <p className="text-sm text-slate-500">
+            {isEditMode
+              ? "Revisa el estado de las aprobaciones de precio y completa la venta"
+              : "Captura de cliente y productos para generar una nueva venta."}
           </p>
         </div>
       </div>
@@ -457,17 +448,17 @@ function NuevaVenta() {
           </div>
           
           {!cliente.Client_Id ? (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-              <p className="text-sm text-gray-600">Selecciona un cliente primero</p>
+            <div className="rounded-[16px] border border-[#dce4f0] bg-[#f4f7ff]/60 p-4 text-center">
+              <p className="text-sm text-slate-500">Selecciona un cliente primero</p>
             </div>
           ) : showAllProducts || recurringProducts.length === 0 ? (
             <ProductoBuscador onAgregarProducto={handleAgregarProducto} />
           ) : (
-            <div className="bg-white border border-gray-200 rounded-lg p-3 max-h-96 overflow-y-auto">
+            <div className="rounded-[16px] border border-[#eaf0fa] bg-white p-3 max-h-96 overflow-y-auto">
               <p className="text-xs text-gray-600 mb-3">Productos recurrentes de este cliente:</p>
               <div className="space-y-2">
                 {recurringProducts.map(rp => (
-                  <div key={rp.Producto_Id} className="bg-gray-50 rounded p-2 flex items-center justify-between hover:bg-gray-100">
+                  <div key={rp.Producto_Id} className="rounded-[10px] border border-[#eaf0fa] bg-[#f4f7ff]/50 p-2 flex items-center justify-between hover:bg-[#eaf0fa]/60 transition">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-semibold text-gray-500">{rp.SKU}</span>
@@ -517,7 +508,7 @@ function NuevaVenta() {
       </div>
 
       {productos.some(p => originalPrices[p.Producto_Id] && p.PrecioUnitario !== originalPrices[p.Producto_Id]) && !priceChangeRequest && (
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
+        <div className="rounded-[18px] border border-amber-200 bg-amber-50 p-4 mb-4">
           <div className="flex justify-between items-center">
             <div>
               <h3 className="text-sm font-semibold text-orange-900 mb-1">Cambios de Precio Detectados</h3>
@@ -536,8 +527,8 @@ function NuevaVenta() {
       )}
 
       {priceChangeRequest && (
-        <div className="bg-white border-2 rounded-lg p-5 mb-4" style={{
-          borderColor: priceChangeRequest.status === 'approved' ? '#10b981' : 
+        <div className="rounded-[18px] border-2 bg-white p-5 mb-4" style={{
+          borderColor: priceChangeRequest.status === 'approved' ? '#10b981' :
                       priceChangeRequest.status === 'rejected' ? '#ef4444' : '#f59e0b'
         }}>
           <div className="flex items-start justify-between mb-4">
@@ -625,27 +616,23 @@ function NuevaVenta() {
       <div className="flex justify-end gap-2 mt-4">
         <button
           onClick={() => navigate("/ventas")}
-          className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
+          className="rounded-[14px] border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
           disabled={guardando}
         >
-          {isEditMode ? 'Volver' : 'Cancelar'}
+          {isEditMode ? "Volver" : "Cancelar"}
         </button>
-        {isEditMode && priceChangeRequest?.status === 'approved' && (
+        {isEditMode && priceChangeRequest?.status === "approved" && (
           <button
             onClick={async () => {
               try {
-                const token = localStorage.getItem('token');
-                await axios.put(`/api/ventas/${ventaId}`, 
-                  { Status_Id: 2 },
-                  { headers: { Authorization: `Bearer ${token}` }}
-                );
-                notify('Venta completada exitosamente', 'success');
-                navigate('/ventas');
+                await api.put(`/ventas/${ventaId}`, { Status_Id: 2 });
+                notify("Venta completada exitosamente", "success");
+                navigate("/ventas");
               } catch (error) {
-                notify('Error al completar venta', 'error');
+                notify("Error al completar venta", "error");
               }
             }}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+            className="rounded-[14px] bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(5,150,105,0.30)]"
           >
             Completar Venta
           </button>
@@ -653,17 +640,15 @@ function NuevaVenta() {
         {!isEditMode && (
           <button
             onClick={handleGuardarVenta}
-            disabled={guardando || (priceChangeRequest && priceChangeRequest.status === 'pending')}
-            className={`px-6 py-2 rounded text-white font-medium ${
-              guardando || (priceChangeRequest && priceChangeRequest.status === 'pending')
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700'
-            }`}
+            disabled={guardando || (priceChangeRequest && priceChangeRequest.status === "pending")}
+            className="rounded-[14px] bg-gradient-to-r from-[#1b3d86] to-[#2a5fc4] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(27,61,134,0.30)] hover:shadow-[0_6px_20px_rgba(27,61,134,0.40)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {guardando ? 'Guardando...' : (priceChangeRequest && priceChangeRequest.status === 'pending' ? 'Esperando aprobaciones...' : 'Guardar Venta')}
+            {guardando ? "Guardando…" : (priceChangeRequest && priceChangeRequest.status === "pending" ? "Esperando aprobaciones…" : "Guardar Venta")}
           </button>
         )}
       </div>
+
+      </div>{/* end max-w container */}
 
       {showPriceModal && (
         <MultiProductPriceChangeModal
@@ -681,3 +666,4 @@ function NuevaVenta() {
 }
 
 export default NuevaVenta;
+

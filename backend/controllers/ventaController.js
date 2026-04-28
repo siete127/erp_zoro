@@ -1,6 +1,58 @@
 const sql = require('mssql');
 const { poolPromise } = require('../config/db');
 
+const getStockEmpresa = async (pool, { productoId, companyId }) => {
+  const stockRes = await pool.request()
+    .input('Producto_Id', sql.Int, productoId)
+    .input('Company_Id', sql.Int, companyId)
+    .query(`
+      SELECT SUM(s.Cantidad) AS StockTotal
+      FROM ERP_STOCK s
+      INNER JOIN ERP_ALMACENES a ON s.Almacen_Id = a.Almacen_Id
+      WHERE s.Producto_Id = @Producto_Id
+        AND a.Company_Id = @Company_Id;
+    `);
+
+  return Number(stockRes.recordset[0]?.StockTotal || 0);
+};
+
+const getStockReservadoOtrasVentas = async (pool, { productoId, companyId, ventaId }) => {
+  const reservedRes = await pool.request()
+    .input('Producto_Id', sql.Int, productoId)
+    .input('Company_Id', sql.Int, companyId)
+    .input('Venta_Id', sql.Int, ventaId)
+    .query(`
+      SELECT SUM(
+        CASE
+          WHEN ISNULL(r.PiezasBuenas, 0) < ISNULL(op.CantidadPlanificada, 0)
+            THEN ISNULL(r.PiezasBuenas, 0)
+          ELSE ISNULL(op.CantidadPlanificada, 0)
+        END
+      ) AS CantidadReservada
+      FROM ERP_OP_PRODUCCION op
+      INNER JOIN ERP_OP_RESULTADO r ON r.OP_Id = op.OP_Id
+      INNER JOIN ERP_VENTAS v ON v.Venta_Id = op.Venta_Id
+      WHERE op.Producto_Id = @Producto_Id
+        AND op.CompanySolicitante_Id = @Company_Id
+        AND op.Venta_Id <> @Venta_Id
+        AND op.Estado = 'CERRADA'
+        AND v.Status_Id NOT IN (3, 4);
+    `);
+
+  return Number(reservedRes.recordset[0]?.CantidadReservada || 0);
+};
+
+const getStockDisponibleParaVenta = async (pool, { productoId, companyId, ventaId }) => {
+  const stockTotal = await getStockEmpresa(pool, { productoId, companyId });
+  const stockReservado = await getStockReservadoOtrasVentas(pool, { productoId, companyId, ventaId });
+
+  return {
+    stockTotal,
+    stockReservado,
+    stockDisponible: Math.max(0, stockTotal - stockReservado),
+  };
+};
+
 // Crear nueva venta
 exports.createVenta = async (req, res) => {
   try {
@@ -174,7 +226,10 @@ exports.getVentaDetalle = async (req, res) => {
       .input('Venta_Id', sql.Int, id)
       .query(`
         SELECT v.*, 
-               ISNULL(s.Nombre, v.Status) as StatusNombre, 
+               CASE 
+                 WHEN UPPER(ISNULL(v.Status, '')) = 'CONFIRMADA' THEN v.Status
+                 ELSE ISNULL(s.Nombre, v.Status)
+               END as StatusNombre,
                s.Descripcion as StatusDescripcion,
                c.RFC as ClienteRFC, 
                c.LegalName as ClienteNombre
@@ -279,7 +334,11 @@ exports.getVentas = async (req, res) => {
 
     const pool = await poolPromise;
     let query = `
-      SELECT v.*, s.Nombre as StatusNombre,
+      SELECT v.*, 
+             CASE 
+               WHEN UPPER(ISNULL(v.Status, '')) = 'CONFIRMADA' THEN v.Status
+               ELSE s.Nombre
+             END as StatusNombre,
              c.RFC as ClienteRFC, c.LegalName as ClienteNombre
       FROM ERP_VENTAS v
       LEFT JOIN ERP_VENTA_STATUS s ON v.Status_Id = s.Status_Id
@@ -324,9 +383,25 @@ exports.getVentas = async (req, res) => {
 exports.facturarVenta = async (req, res) => {
   try {
     const { id } = req.params;
-    const { UsoCFDI = 'G03', FormaPago = '01', MetodoPago = 'PUE' } = req.body;
+    const {
+      UsoCFDI = 'G03',
+      FormaPago = '01',
+      MetodoPago = 'PUE',
+      ReceptorNombre,
+      ReceptorRFC,
+      ReceptorFiscalRegime,
+      ReceptorTaxZipCode,
+      ReceptorEmail,
+    } = req.body;
+
+    const withFallback = (value, fallback) => {
+      if (value === undefined || value === null) return fallback;
+      const trimmed = String(value).trim();
+      return trimmed.length > 0 ? trimmed : fallback;
+    };
 
     const pool = await poolPromise;
+    const GENERIC_RFCS = new Set(['XAXX010101000', 'XEXX010101000']);
 
     // Obtener venta con datos del cliente y contacto primario
     const ventaResult = await pool.request()
@@ -365,6 +440,32 @@ exports.facturarVenta = async (req, res) => {
       return res.status(400).json({ success: false, message: 'La venta ya está facturada' });
     }
 
+    const ventaConfirmada = String(venta.Status || '').trim().toLowerCase() === 'confirmada';
+
+    if (venta.Status_Id !== 2 || !ventaConfirmada) {
+      return res.status(400).json({
+        success: false,
+        message: 'Primero debe confirmar la venta para poder facturarla'
+      });
+    }
+
+    const opPendientesResult = await pool.request()
+      .input('Venta_Id', sql.Int, id)
+      .query(`
+        SELECT COUNT(*) AS TotalPendientes
+        FROM ERP_OP_PRODUCCION
+        WHERE Venta_Id = @Venta_Id
+          AND Estado <> 'CERRADA'
+      `);
+
+    const totalOpPendientes = Number(opPendientesResult.recordset[0]?.TotalPendientes || 0);
+    if (totalOpPendientes > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `La venta tiene ${totalOpPendientes} orden(es) de producción sin cerrar. Confirme la venta cuando la producción esté concluida.`
+      });
+    }
+
     // Obtener detalle
     const detalleResult = await pool.request()
       .input('Venta_Id', sql.Int, id)
@@ -398,19 +499,13 @@ exports.facturarVenta = async (req, res) => {
     for (const item of detalle) {
       if (!item.Producto_Id) continue;
 
-      // 1) Verificar stock PROPIO de la empresa que vende
-      const stockRes = await pool.request()
-        .input('Producto_Id', sql.Int, item.Producto_Id)
-        .input('Company_Id', sql.Int, venta.Company_Id)
-        .query(`
-          SELECT SUM(s.Cantidad) AS StockTotal
-          FROM ERP_STOCK s
-          INNER JOIN ERP_ALMACENES a ON s.Almacen_Id = a.Almacen_Id
-          WHERE s.Producto_Id = @Producto_Id
-            AND a.Company_Id = @Company_Id;
-        `);
-
-      const stockPropio = Number(stockRes.recordset[0]?.StockTotal || 0);
+      // 1) Verificar stock PROPIO disponible para esta venta (descontando reservas de otras ventas)
+      const stockPropioInfo = await getStockDisponibleParaVenta(pool, {
+        productoId: item.Producto_Id,
+        companyId: venta.Company_Id,
+        ventaId: Number(id),
+      });
+      const stockPropio = stockPropioInfo.stockDisponible;
       const cant = Number(item.Cantidad || 0);
 
       if (stockPropio >= cant) continue; // Stock propio suficiente
@@ -418,17 +513,12 @@ exports.facturarVenta = async (req, res) => {
       // 2) Verificar stock de PTC (empresa productora)
       let stockPTC = 0;
       if (ptcCompanyId && ptcCompanyId !== venta.Company_Id) {
-        const stockPTCRes = await pool.request()
-          .input('Producto_Id', sql.Int, item.Producto_Id)
-          .input('PTC_Company_Id', sql.Int, ptcCompanyId)
-          .query(`
-            SELECT SUM(s.Cantidad) AS StockTotal
-            FROM ERP_STOCK s
-            INNER JOIN ERP_ALMACENES a ON s.Almacen_Id = a.Almacen_Id
-            WHERE s.Producto_Id = @Producto_Id
-              AND a.Company_Id = @PTC_Company_Id;
-          `);
-        stockPTC = Number(stockPTCRes.recordset[0]?.StockTotal || 0);
+        const stockPTCInfo = await getStockDisponibleParaVenta(pool, {
+          productoId: item.Producto_Id,
+          companyId: ptcCompanyId,
+          ventaId: Number(id),
+        });
+        stockPTC = stockPTCInfo.stockDisponible;
       }
 
       const faltantePropio = cant - stockPropio;
@@ -446,10 +536,12 @@ exports.facturarVenta = async (req, res) => {
           ORDER BY Version DESC
         `);
 
-      productosConFaltante.push({
+      if (faltanteTotal > 0) productosConFaltante.push({
         Producto_Id: item.Producto_Id,
         Nombre: item.Nombre,
         StockPropio: stockPropio,
+        StockPropioFisico: stockPropioInfo.stockTotal,
+        StockPropioReservado: stockPropioInfo.stockReservado,
         StockPTC: stockPTC,
         DisponiblePTC: disponiblePTC,
         CantidadRequerida: cant,
@@ -495,20 +587,30 @@ exports.facturarVenta = async (req, res) => {
       }
     }));
 
-    // Validar y normalizar RFC del cliente - SIEMPRE usar RFC genérico en sandbox
-    const clienteRFC = 'XAXX010101000'; // RFC genérico para público en general
-    const clienteZipCode = '01000'; // Código postal genérico
-    const usoCFDI = UsoCFDI === 'G03' ? 'S01' : UsoCFDI; // S01 es válido para régimen 616
-    console.log('Usando RFC genérico para evitar errores de validación en sandbox');
+    const clientRfc = String(venta.ClienteRFC || '').trim().toUpperCase();
+    const bodyRfc = String(ReceptorRFC || '').trim().toUpperCase();
+
+    if (clientRfc && bodyRfc && bodyRfc !== clientRfc) {
+      return res.status(400).json({
+        success: false,
+        message: 'El RFC del receptor no coincide con el RFC fiscal del cliente asociado a la venta'
+      });
+    }
+
+    const receiverRfc = withFallback(bodyRfc, clientRfc);
+    const legalName = withFallback(venta.ClienteNombre, null);
+    const requestedName = withFallback(ReceptorNombre, null);
+    const shouldUseLegalName = !!legalName && !!receiverRfc && !GENERIC_RFCS.has(receiverRfc);
+    const receiverName = shouldUseLegalName ? legalName : withFallback(requestedName, legalName);
 
     const cfdiData = {
       Receptor: {
-        Rfc: clienteRFC,
-        Nombre: 'PUBLICO EN GENERAL',
-        Email: venta.ClienteEmail || 'cliente@ejemplo.com',
-        FiscalRegime: '616',
-        TaxZipCode: clienteZipCode,
-        UsoCfdi: usoCFDI
+        Rfc: receiverRfc,
+        Nombre: receiverName,
+        Email: withFallback(ReceptorEmail, venta.ClienteEmail),
+        FiscalRegime: withFallback(ReceptorFiscalRegime, venta.ClienteFiscalRegime),
+        TaxZipCode: withFallback(ReceptorTaxZipCode, venta.ClienteTaxZipCode),
+        UsoCfdi: UsoCFDI
       },
       Conceptos: conceptos,
       FormaPago: FormaPago,
@@ -516,9 +618,88 @@ exports.facturarVenta = async (req, res) => {
       Moneda: venta.Moneda
     };
 
+    // Determinar la empresa emisora para el timbrado.
+    // Reglas:
+    // - Si el cliente provee `issuerCompanyId` (body, query o header `x-company-id`), se usa tras validar pertenencia.
+    // - Si el usuario está asignado a una sola compañía, se usa esa.
+    // - Si el usuario pertenece a varias compañías y no se especifica, devolver 400 solicitando `issuerCompanyId`.
+    let issuerCompanyId = null;
+    const candidateFromBody = req.body && (req.body.issuerCompanyId || req.body.IssuerCompanyId);
+    const candidateFromQuery = req.query && (req.query.issuerCompanyId || req.query.IssuerCompanyId);
+    const candidateFromHeader = req.headers['x-company-id'] || req.headers['X-Company-Id'];
+
+    if (candidateFromBody) issuerCompanyId = Number(candidateFromBody);
+    else if (candidateFromQuery) issuerCompanyId = Number(candidateFromQuery);
+    else if (candidateFromHeader) issuerCompanyId = Number(candidateFromHeader);
+
+    const userCompanies = Array.isArray(req.userCompanies) ? req.userCompanies.map(Number) : [];
+
+    if (issuerCompanyId) {
+      if (!userCompanies.includes(issuerCompanyId)) {
+        return res.status(403).json({ success: false, message: 'No tiene permisos para timbrar como esa empresa' });
+      }
+    } else if (userCompanies.length === 1) {
+      issuerCompanyId = Number(userCompanies[0]);
+    } else {
+      return res.status(400).json({ success: false, message: 'Usuario asignado a múltiples empresas. Especifique `issuerCompanyId` en body/query/header `x-company-id`.' });
+    }
+
+    const facturaPayload = await facturamaService.buildFacturaPayload(cfdiData, issuerCompanyId);
+
     // Enviar a PAC
-    console.log('Enviando a Facturama:', JSON.stringify(cfdiData, null, 2));
-    const cfdiResult = await facturamaService.crearFactura(cfdiData, venta.Company_Id);
+    console.log('Enviando a Facturama (issuer companyId=' + issuerCompanyId + '):', JSON.stringify(facturaPayload, null, 2));
+    // Selección de credenciales por empresa: buscamos primero en .env (convención)
+    // Si realmente quieres que el sistema lea la BD, define FACTURAMA_USE_DB=true en .env
+    const companyId = issuerCompanyId;
+    let companyUser = null;
+    let companyPass = null;
+
+    // Buscar en .env con las claves por convención
+    const envUserKeys = [
+      `FACTURAMA_USER_COMPANY_${companyId}`,
+      `FACTURAMA_USER_${companyId}`
+    ];
+    const envPassKeys = [
+      `FACTURAMA_PASSWORD_COMPANY_${companyId}`,
+      `FACTURAMA_PASSWORD_${companyId}`
+    ];
+
+    for (const k of envUserKeys) {
+      if (process.env[k]) { companyUser = String(process.env[k]).trim(); break; }
+    }
+    for (const k of envPassKeys) {
+      if (process.env[k]) { companyPass = String(process.env[k]).trim(); break; }
+    }
+
+    if (companyUser && companyPass) {
+      console.log(`[Facturama] Credenciales encontradas en .env para Company_Id=${companyId}, user=${companyUser}`);
+    } else if (process.env.FACTURAMA_USE_DB && String(process.env.FACTURAMA_USE_DB).toLowerCase() === 'true') {
+      // Solo intentar leer DB si FACTURAMA_USE_DB=true
+      try {
+        const credRes = await pool.request()
+          .input('Company_Id', sql.Int, companyId)
+          .query(`SELECT TOP 1 FacturamaUser, FacturamaPassword FROM ERP_COMPANY WHERE Company_Id = @Company_Id`);
+        if (credRes && credRes.recordset && credRes.recordset.length > 0) {
+          const row = credRes.recordset[0];
+          if (row.FacturamaUser && row.FacturamaPassword) {
+            companyUser = String(row.FacturamaUser).trim();
+            companyPass = String(row.FacturamaPassword).trim();
+            console.log(`[Facturama] Credenciales encontradas en BD para Company_Id=${companyId}, user=${companyUser}`);
+          }
+        }
+      } catch (dbCredErr) {
+        console.debug('[Facturama] No se pudo leer credenciales desde BD (posible columna faltante):', dbCredErr.message || dbCredErr);
+      }
+    } else {
+      console.log('[Facturama] No se encontraron credenciales por empresa en .env — usando credenciales globales.');
+    }
+
+    let authBase64 = null;
+    if (companyUser && companyPass) {
+      authBase64 = Buffer.from(`${companyUser}:${companyPass}`).toString('base64');
+    }
+
+    const cfdiResult = await facturamaService.timbrarMultiemisor(facturaPayload, { authBase64 });
 
     // Descontar inventario
     const transaction = new sql.Transaction(pool);
@@ -585,11 +766,6 @@ exports.facturarVenta = async (req, res) => {
       }
 
       // Guardar factura en la tabla ERP_FACTURAS
-      const emisorData = await pool.request()
-        .input('Company_Id', sql.Int, venta.Company_Id)
-        .query('SELECT RFC FROM ERP_COMPANY WHERE Company_Id = @Company_Id');
-      
-      const emisorRFC = emisorData.recordset[0]?.RFC;
       const uuid = cfdiResult.Complement?.TaxStamp?.Uuid || cfdiResult.Id || 'TEMP-' + Date.now();
       const facturamaId = cfdiResult.Id || uuid;
       
@@ -600,9 +776,9 @@ exports.facturarVenta = async (req, res) => {
         .input('FacturamaId', sql.VarChar(50), facturamaId)
         .input('Serie', sql.VarChar(10), cfdiResult.Serie || null)
         .input('Folio', sql.VarChar(20), cfdiResult.Folio || null)
-        .input('EmisorRFC', sql.VarChar(13), emisorRFC)
-        .input('ReceptorRFC', sql.VarChar(13), venta.ClienteRFC)
-        .input('ReceptorNombre', sql.VarChar(255), venta.ClienteNombre)
+        .input('EmisorRFC', sql.VarChar(13), facturaPayload.Issuer.Rfc)
+        .input('ReceptorRFC', sql.VarChar(13), facturaPayload.Receiver.Rfc)
+        .input('ReceptorNombre', sql.VarChar(255), facturaPayload.Receiver.Name)
         .input('Subtotal', sql.Decimal(18, 2), venta.Subtotal)
         .input('IVA', sql.Decimal(18, 2), venta.IVA)
         .input('Total', sql.Decimal(18, 2), venta.Total)
@@ -626,6 +802,85 @@ exports.facturarVenta = async (req, res) => {
         .input('Venta_Id', sql.Int, id)
         .input('Status_Id', sql.Int, 3)
         .query('UPDATE ERP_VENTAS SET Status_Id = @Status_Id, Status = \'Facturada\' WHERE Venta_Id = @Venta_Id');
+
+      // ----------------------
+      // Insertar asientos contables vinculados a la factura
+      // ----------------------
+      try {
+        const safeNumber = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+
+        // Obtener Factura_Id recién insertada (evitar duplicados)
+        const fcheckRes = await transaction.request()
+          .input('FacturamaId', sql.VarChar(50), facturamaId)
+          .input('UUID', sql.VarChar(50), uuid)
+          .query('SELECT TOP 1 Factura_Id FROM ERP_FACTURAS WHERE FacturamaId = @FacturamaId OR UUID = @UUID');
+
+        const facturaIdInserted = (fcheckRes.recordset && fcheckRes.recordset[0]) ? Number(fcheckRes.recordset[0].Factura_Id) : null;
+
+        if (facturaIdInserted) {
+          // Helper: buscar account code por keywords
+          const findAccountCode = async (keywords = []) => {
+            try {
+              const search = keywords.map(k => `LOWER(Name) LIKE '%${k}%'`).join(' OR ');
+              const q = `SELECT TOP 1 AccountCode FROM ERP_ACCOUNTS WHERE (${search}) AND Company_Id = @Company_Id`;
+              const r = await transaction.request().input('Company_Id', sql.Int, venta.Company_Id).query(q);
+              if (r.recordset && r.recordset[0]) return r.recordset[0].AccountCode;
+            } catch (e) {
+              // ignore
+            }
+            return null;
+          };
+
+          let accountReceivable = await findAccountCode(['cliente','clientes','por cobrar','cxp']);
+          let accountRevenue = await findAccountCode(['venta','ventas','ingreso','ingresos']);
+          let accountVAT = await findAccountCode(['iva','impuesto']);
+
+          accountReceivable = accountReceivable || '1300';
+          accountRevenue = accountRevenue || '4000';
+          accountVAT = accountVAT || '2100';
+
+          const Subtotal = safeNumber(venta.Subtotal);
+          const IVA = safeNumber(venta.IVA);
+          const Total = safeNumber(venta.Total);
+
+          // Evitar duplicar asientos: comprobar si ya existen registros en ERP_LEDGER para esta referencia
+          let existingLedgerCount = 0;
+          try {
+            const ledRes = await transaction.request().input('RefId', sql.Int, facturaIdInserted).query('SELECT COUNT(1) AS cnt FROM ERP_LEDGER WHERE Reference_Id = @RefId');
+            existingLedgerCount = (ledRes.recordset && ledRes.recordset[0] && Number(ledRes.recordset[0].cnt)) || 0;
+          } catch (e) {
+            existingLedgerCount = 0;
+          }
+
+          if (existingLedgerCount === 0) {
+            const ledgerInsert = async (acctCode, debit, credit, refId, desc) => {
+              await transaction.request()
+                .input('Date', sql.DateTime, new Date())
+                .input('AccountCode', sql.VarChar(50), acctCode)
+                .input('Debit', sql.Decimal(18,2), debit)
+                .input('Credit', sql.Decimal(18,2), credit)
+                .input('Reference_Id', sql.Int, refId)
+                .input('Company_Id', sql.Int, venta.Company_Id)
+                .input('Description', sql.VarChar(500), desc)
+                .query(`INSERT INTO ERP_LEDGER (Date, AccountCode, Debit, Credit, Reference_Id, Company_Id, Description, CreatedAt)
+                        VALUES (@Date, @AccountCode, @Debit, @Credit, @Reference_Id, @Company_Id, @Description, GETDATE())`);
+            };
+
+            // Debito CxC = Total
+            await ledgerInsert(accountReceivable, Total, 0, facturaIdInserted, `Factura ${facturamaId} - Cliente ${facturaPayload.Receiver?.Rfc || ''}`);
+
+            // Credito Ventas = Subtotal
+            if (Subtotal > 0) await ledgerInsert(accountRevenue, 0, Subtotal, facturaIdInserted, `Factura ${facturamaId} - Venta`);
+
+            // Credito IVA = IVA
+            if (IVA > 0) await ledgerInsert(accountVAT, 0, IVA, facturaIdInserted, `Factura ${facturamaId} - IVA`);
+          } else {
+            console.log('Asientos ya existentes para Factura_Id', facturaIdInserted, '- omitiendo inserción.');
+          }
+        }
+      } catch (errLedger) {
+        console.warn('Error insertando asientos en ventaController (se continúa):', errLedger?.message || errLedger);
+      }
 
       await transaction.commit();
 
@@ -657,6 +912,197 @@ exports.facturarVenta = async (req, res) => {
       message: errorMessage,
       details: error.ModelState || error
     });
+  }
+};
+
+// Confirmar venta (requisito previo a facturación)
+exports.confirmarVenta = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = await poolPromise;
+
+    const ventaResult = await pool.request()
+      .input('Venta_Id', sql.Int, id)
+      .query('SELECT Venta_Id, Company_Id, Status_Id, Status FROM ERP_VENTAS WHERE Venta_Id = @Venta_Id');
+
+    if (ventaResult.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: 'Venta no encontrada' });
+    }
+
+    const venta = ventaResult.recordset[0];
+
+    if (!req.isAdmin && req.userCompanies && req.userCompanies.length > 0) {
+      if (!req.userCompanies.includes(venta.Company_Id)) {
+        return res.status(403).json({
+          success: false,
+          message: 'No tiene permisos para confirmar ventas de esta empresa'
+        });
+      }
+    }
+
+    if (venta.Status_Id === 3) {
+      return res.status(400).json({ success: false, message: 'La venta ya está facturada' });
+    }
+
+    if (venta.Status_Id === 4) {
+      return res.status(400).json({ success: false, message: 'No se puede confirmar una venta cancelada' });
+    }
+
+    if (String(venta.Status || '').trim().toLowerCase() === 'confirmada') {
+      return res.json({
+        success: true,
+        message: 'La venta ya estaba confirmada',
+        data: {
+          Venta_Id: Number(id),
+          Status_Id: 2,
+          Status: 'Confirmada'
+        }
+      });
+    }
+
+    const opResumenResult = await pool.request()
+      .input('Venta_Id', sql.Int, id)
+      .query(`
+        SELECT
+          COUNT(*) AS TotalOP,
+          SUM(CASE WHEN Estado = 'CERRADA' THEN 1 ELSE 0 END) AS TotalOPCerradas,
+          SUM(CASE WHEN Estado <> 'CERRADA' THEN 1 ELSE 0 END) AS TotalOPPendientes
+        FROM ERP_OP_PRODUCCION
+        WHERE Venta_Id = @Venta_Id
+      `);
+
+    const totalOP = Number(opResumenResult.recordset[0]?.TotalOP || 0);
+    const totalOPPendientes = Number(opResumenResult.recordset[0]?.TotalOPPendientes || 0);
+
+    if (totalOP > 0 && totalOPPendientes > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `No se puede confirmar la venta: hay ${totalOPPendientes} orden(es) de producción pendientes de cierre`
+      });
+    }
+
+    const detalleResult = await pool.request()
+      .input('Venta_Id', sql.Int, id)
+      .query(`
+        SELECT vd.*, p.Nombre
+        FROM ERP_VENTA_DETALLE vd
+        LEFT JOIN ERP_PRODUCTOS p ON vd.Producto_Id = p.Producto_Id
+        WHERE vd.Venta_Id = @Venta_Id
+      `);
+
+    const detalle = detalleResult.recordset || [];
+
+    if (detalle.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se puede confirmar una venta sin productos.'
+      });
+    }
+
+    const productosConFaltante = [];
+
+    const ptcResult = await pool.request().query(`
+      SELECT TOP 1 Company_Id FROM ERP_COMPANY
+      WHERE NameCompany LIKE '%PTC%'
+    `);
+    const ptcCompanyId = ptcResult.recordset.length > 0 ? ptcResult.recordset[0].Company_Id : null;
+
+    for (const item of detalle) {
+      if (!item.Producto_Id) continue;
+
+      const stockPropioInfo = await getStockDisponibleParaVenta(pool, {
+        productoId: item.Producto_Id,
+        companyId: venta.Company_Id,
+        ventaId: Number(id),
+      });
+      const stockPropio = stockPropioInfo.stockDisponible;
+      const cant = Number(item.Cantidad || 0);
+
+      if (stockPropio >= cant) continue;
+
+      let stockPTC = 0;
+      if (ptcCompanyId && ptcCompanyId !== venta.Company_Id) {
+        const stockPTCInfo = await getStockDisponibleParaVenta(pool, {
+          productoId: item.Producto_Id,
+          companyId: ptcCompanyId,
+          ventaId: Number(id),
+        });
+        stockPTC = stockPTCInfo.stockDisponible;
+      }
+
+      const faltantePropio = cant - stockPropio;
+      const disponiblePTC = Math.min(stockPTC, faltantePropio);
+      const faltanteTotal = faltantePropio - disponiblePTC;
+
+      const bomRes = await pool.request()
+        .input('Producto_Id', sql.Int, item.Producto_Id)
+        .query(`
+          SELECT TOP 1 BOM_Id
+          FROM ERP_BOM
+          WHERE Producto_Id = @Producto_Id
+            AND Vigente = 1
+          ORDER BY Version DESC
+        `);
+
+      if (faltanteTotal > 0) productosConFaltante.push({
+        Producto_Id: item.Producto_Id,
+        Nombre: item.Nombre,
+        StockPropio: stockPropio,
+        StockPropioFisico: stockPropioInfo.stockTotal,
+        StockPropioReservado: stockPropioInfo.stockReservado,
+        StockPTC: stockPTC,
+        DisponiblePTC: disponiblePTC,
+        CantidadRequerida: cant,
+        Faltante: faltanteTotal > 0 ? faltanteTotal : 0,
+        FaltantePropio: faltantePropio,
+        TieneBOM: bomRes.recordset.length > 0,
+        RequiereProduccion: faltanteTotal > 0 && bomRes.recordset.length > 0,
+        PuedeSurtirPTC: disponiblePTC > 0
+      });
+    }
+
+    if (productosConFaltante.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Inventario insuficiente. Verifique stock de PTC o solicite producción.',
+        requiereProduccion: true,
+        productos: productosConFaltante,
+        ptcCompanyId,
+        sugerencia: 'Los productos con faltante pueden solicitarse a PTC (producción) o surtirse de su stock existente'
+      });
+    }
+
+    const statusText = 'Confirmada';
+
+    await pool.request()
+      .input('Venta_Id', sql.Int, id)
+      .input('Status_Id', sql.Int, 2)
+      .input('Status', sql.VarChar, statusText)
+      .query(`
+        UPDATE ERP_VENTAS
+        SET Status_Id = @Status_Id,
+            Status = @Status
+        WHERE Venta_Id = @Venta_Id
+      `);
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('venta:changed', { Venta_Id: Number(id) });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Venta confirmada correctamente. Ahora puede facturar.',
+      data: {
+        Venta_Id: Number(id),
+        Status_Id: 2,
+        Status: statusText,
+        TotalOP: totalOP
+      }
+    });
+  } catch (error) {
+    console.error('Error al confirmar venta:', error);
+    return res.status(500).json({ success: false, message: 'Error al confirmar venta', error: error.message });
   }
 };
 
@@ -1001,36 +1447,16 @@ exports.crearOrdenesProduccion = async (req, res) => {
         ordenesCreadas.push(result.recordset[0]);
       }
 
-      // Actualizar estado de venta a "En Producción".
-      // Intentar con Status_Id = 5, si no existe usar Status_Id = 2 (compatibilidad con instalaciones antiguas).
-      let targetStatusId = null;
-      const try5 = await transaction.request()
-        .input('Status_Id', sql.Int, 5)
-        .query('SELECT Status_Id FROM ERP_VENTA_STATUS WHERE Status_Id = @Status_Id');
-
-      if (try5.recordset.length > 0) {
-        targetStatusId = 5;
-      } else {
-        const try2 = await transaction.request()
-          .input('Status_Id', sql.Int, 2)
-          .query('SELECT Status_Id FROM ERP_VENTA_STATUS WHERE Status_Id = @Status_Id');
-
-        if (try2.recordset.length > 0) {
-          targetStatusId = 2;
-        }
-      }
-
-      if (targetStatusId) {
-        await transaction.request()
-          .input('Venta_Id', sql.Int, id)
-          .input('Status_Id', sql.Int, targetStatusId)
-          .input('Status', sql.VarChar, 'En Producción')
-          .query(`
-            UPDATE ERP_VENTAS 
-            SET Status_Id = @Status_Id, Status = @Status
-            WHERE Venta_Id = @Venta_Id
-          `);
-      }
+      // Al enviar a producción, la venta se mantiene en "Pendiente"
+      await transaction.request()
+        .input('Venta_Id', sql.Int, id)
+        .input('Status_Id', sql.Int, 1)
+        .input('Status', sql.VarChar, 'Pendiente')
+        .query(`
+          UPDATE ERP_VENTAS
+          SET Status_Id = @Status_Id, Status = @Status
+          WHERE Venta_Id = @Venta_Id
+        `);
 
       await transaction.commit();
 
@@ -1176,7 +1602,7 @@ exports.registrarEntradaProduccion = async (req, res) => {
   }
 };
 
-// Obtener URL del PDF de factura
+// Descargar PDF de factura
 exports.getFacturaPDFUrl = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1184,19 +1610,45 @@ exports.getFacturaPDFUrl = async (req, res) => {
     
     const facturaResult = await pool.request()
       .input('Venta_Id', sql.Int, id)
-      .query('SELECT FacturamaId, UUID FROM ERP_FACTURAS WHERE Venta_Id = @Venta_Id');
+      .query(`
+        SELECT f.FacturamaId, f.UUID, v.Company_Id
+        FROM ERP_FACTURAS f
+        INNER JOIN ERP_VENTAS v ON v.Venta_Id = f.Venta_Id
+        WHERE f.Venta_Id = @Venta_Id
+      `);
 
     if (facturaResult.recordset.length === 0) {
       return res.status(404).json({ success: false, message: 'Factura no encontrada' });
     }
 
-    const facturamaId = facturaResult.recordset[0].FacturamaId || facturaResult.recordset[0].UUID;
-    // Multiemisor usa issuedLite, con fallback a issued
-    const pdfUrl = `${process.env.FACTURAMA_BASE_URL}/cfdi/pdf/issuedLite/${facturamaId}`;
-    
-    res.json({ success: true, pdfUrl });
+    const factura = facturaResult.recordset[0];
+
+    if (!req.isAdmin && req.userCompanies && req.userCompanies.length > 0) {
+      if (!req.userCompanies.includes(factura.Company_Id)) {
+        return res.status(403).json({
+          success: false,
+          message: 'No tiene permisos para descargar factura de esta empresa'
+        });
+      }
+    }
+
+    const facturamaId = factura.FacturamaId || factura.UUID;
+    if (!facturamaId || String(facturamaId).startsWith('TEMP-')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Esta factura no tiene un ID válido de Facturama'
+      });
+    }
+
+    const facturamaService = require('../services/facturamaService');
+    const pdfData = await facturamaService.descargarPDF(facturamaId);
+    const pdfBuffer = Buffer.isBuffer(pdfData) ? pdfData : Buffer.from(pdfData || []);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="factura-${facturamaId}.pdf"`);
+    return res.send(pdfBuffer);
   } catch (error) {
-    console.error('Error al obtener URL del PDF:', error);
-    res.status(500).json({ success: false, message: 'Error al obtener URL del PDF', error: error.message });
+    console.error('Error al descargar PDF de factura:', error);
+    res.status(500).json({ success: false, message: 'Error al descargar PDF de factura', error: error.message });
   }
 };
