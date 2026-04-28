@@ -1,5 +1,8 @@
 const jwt = require('jsonwebtoken');
 const { pool, sql } = require('../config/db');
+const { getJwtSecret } = require('../config/env');
+
+const jwtSecret = getJwtSecret();
 
 // Middleware to validate JWT, load user and ensure user is active
 module.exports = async function (req, res, next) {
@@ -12,7 +15,7 @@ module.exports = async function (req, res, next) {
 
 		let payload;
 		try {
-			payload = jwt.verify(token, process.env.ERP_SECRET_KEY || 'ERP_SECRET_KEY');
+			payload = jwt.verify(token, jwtSecret);
 		} catch (err) {
 			return res.status(401).json({ msg: 'Token inválido' });
 		}

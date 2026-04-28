@@ -1,13 +1,15 @@
 const sql = require("mssql");
+const { getRequiredEnv } = require("./env");
 
 const config = {
-  user: "sa",
-  password: "D1g1t4l3dg32024.",
-  server: "74.208.195.73",
-  database: "ERP",
+  user: getRequiredEnv("DB_USER"),
+  password: getRequiredEnv("DB_PASSWORD"),
+  server: getRequiredEnv("DB_SERVER"),
+  database: getRequiredEnv("DB_DATABASE"),
+  port: Number(process.env.DB_PORT || 1433),
   options: {
-    encrypt: false,
-    trustServerCertificate: true
+    encrypt: String(process.env.DB_ENCRYPT || "false").toLowerCase() === "true",
+    trustServerCertificate: String(process.env.DB_TRUST_SERVER_CERTIFICATE || "true").toLowerCase() === "true"
   }
 };
 

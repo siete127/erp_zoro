@@ -1,8 +1,9 @@
 const { pool, sql } = require("../config/db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { getJwtSecret } = require("../config/env");
 
-const jwtSecret = process.env.ERP_SECRET_KEY || 'ERP_SECRET_KEY';
+const jwtSecret = getJwtSecret();
 
 exports.login = async (req, res) => {
   const { username, password } = req.body;

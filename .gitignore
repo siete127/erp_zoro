@@ -1,0 +1,41 @@
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.local.example
+!.env.production.example
+
+# Dependencies
+**/node_modules/
+
+# Build artifacts
+**/dist/
+**/build/
+**/coverage/
+**/.next/
+
+# Runtime / generated content
+**/uploads/
+**/logs/
+**/tmp/
+**/temp/
+*.log
+
+# Python
+**/__pycache__/
+**/*.pyc
+.venv/
+venv/
+
+# Archives / heavy artifacts
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
