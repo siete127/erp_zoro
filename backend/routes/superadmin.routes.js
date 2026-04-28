@@ -1,11 +1,14 @@
 const express = require("express");
 const { pool, sql } = require("../config/db");
+const authMiddleware = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
+router.use(authMiddleware);
+
 // Middleware para verificar que es SuperAdmin
 const checkSuperAdmin = (req, res, next) => {
-  if (req.user && req.user.rol === 1) {
+  if (req.isSuperAdmin || req.user?.RolId === 1) {
     next();
   } else {
     return res.status(403).json({ msg: "Acceso denegado: requiere permisos de SuperAdmin" });

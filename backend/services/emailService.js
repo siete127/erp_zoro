@@ -1,26 +1,29 @@
 const nodemailer = require("nodemailer");
+const { getRequiredEnv } = require("../config/env");
 
-// Configuración del transporter de Gmail
+const emailUser = getRequiredEnv("EMAIL_USER");
+const emailPassword = getRequiredEnv("EMAIL_PASSWORD");
+const frontendUrl = getRequiredEnv("FRONTEND_URL").replace(/\/$/, "");
+
 const createTransporter = () => {
   return nodemailer.createTransport({
     service: "gmail",
     auth: {
-      user: process.env.EMAIL_USER || "tecardaby@gmail.com", // Configura esto en .env
-      pass: process.env.EMAIL_PASSWORD || "rstb looi gmmf kmwx" // Usa contraseña de aplicación de Google
-    }
+      user: emailUser,
+      pass: emailPassword,
+    },
   });
 };
 
-// Función genérica para enviar correos
 exports.sendMail = async ({ to, subject, text, html }) => {
   const transporter = createTransporter();
-  
+
   const mailOptions = {
-    from: `"ERP Sistema" <${process.env.EMAIL_USER || "tecardaby@gmail.com"}>`,
+    from: `"ERP Sistema" <${emailUser}>`,
     to,
     subject,
     text,
-    html
+    html,
   };
 
   try {
@@ -33,16 +36,14 @@ exports.sendMail = async ({ to, subject, text, html }) => {
   }
 };
 
-// Enviar correo de recuperación de contraseña
 exports.sendPasswordResetEmail = async (to, username, resetToken) => {
   const transporter = createTransporter();
-  
-  const resetUrl = `https://qaerp.ardabytec.vip/reset-password?token=${resetToken}`;
-  
+  const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+
   const mailOptions = {
-    from: `"ERP Sistema" <${process.env.EMAIL_USER || "tu-email@gmail.com"}>`,
-    to: to,
-    subject: "Recuperación de Contraseña - ERP Sistema",
+    from: `"ERP Sistema" <${emailUser}>`,
+    to,
+    subject: "Recuperacion de Contrasena - ERP Sistema",
     html: `
       <!DOCTYPE html>
       <html>
@@ -86,28 +87,28 @@ exports.sendPasswordResetEmail = async (to, username, resetToken) => {
         <body>
           <div class="container">
             <div class="content">
-              <h2 style="color: #667eea;">Recuperación de Contraseña</h2>
+              <h2 style="color: #667eea;">Recuperacion de Contrasena</h2>
               <p>Hola <strong>${username}</strong>,</p>
-              <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta en el sistema ERP.</p>
-              <p>Para restablecer tu contraseña, haz clic en el siguiente botón:</p>
+              <p>Recibimos una solicitud para restablecer la contrasena de tu cuenta en el sistema ERP.</p>
+              <p>Para restablecer tu contrasena, haz clic en el siguiente boton:</p>
               <div style="text-align: center;">
-                <a href="${resetUrl}" class="button">Restablecer Contraseña</a>
+                <a href="${resetUrl}" class="button">Restablecer Contrasena</a>
               </div>
-              <p><strong>Este enlace expirará en 1 hora.</strong></p>
+              <p><strong>Este enlace expirara en 1 hora.</strong></p>
               <p>Si no solicitaste este cambio, puedes ignorar este correo de forma segura.</p>
               <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
               <p style="font-size: 12px; color: #666;">
-                Si el botón no funciona, copia y pega este enlace en tu navegador:<br>
+                Si el boton no funciona, copia y pega este enlace en tu navegador:<br>
                 <a href="${resetUrl}" style="color: #667eea; word-break: break-all;">${resetUrl}</a>
               </p>
             </div>
             <div class="footer">
-              <p>© 2026 ERP PROYECTO - Todos los derechos reservados</p>
+              <p>&copy; 2026 ERP PROYECTO - Todos los derechos reservados</p>
             </div>
           </div>
         </body>
       </html>
-    `
+    `,
   };
 
   try {
@@ -120,14 +121,13 @@ exports.sendPasswordResetEmail = async (to, username, resetToken) => {
   }
 };
 
-// Enviar correo de confirmación de cambio de contraseña
 exports.sendPasswordChangedEmail = async (to, username) => {
   const transporter = createTransporter();
-  
+
   const mailOptions = {
-    from: `"ERP Sistema" <${process.env.EMAIL_USER || "tecardaby@gmail.com"}>`,
-    to: to,
-    subject: "Contraseña Actualizada - ERP Sistema",
+    from: `"ERP Sistema" <${emailUser}>`,
+    to,
+    subject: "Contrasena Actualizada - ERP Sistema",
     html: `
       <!DOCTYPE html>
       <html>
@@ -155,27 +155,27 @@ exports.sendPasswordChangedEmail = async (to, username) => {
         <body>
           <div class="container">
             <div class="content">
-              <h2 style="color: #10b981;">✓ Contraseña Actualizada</h2>
+              <h2 style="color: #10b981;">Contrasena Actualizada</h2>
               <p>Hola <strong>${username}</strong>,</p>
-              <p>Tu contraseña ha sido actualizada exitosamente.</p>
+              <p>Tu contrasena ha sido actualizada exitosamente.</p>
               <p>Si no realizaste este cambio, por favor contacta al administrador del sistema inmediatamente.</p>
               <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
               <p style="font-size: 12px; color: #666;">
-                © 2026 ERP PROYECTO - Todos los derechos reservados
+                &copy; 2026 ERP PROYECTO - Todos los derechos reservados
               </p>
             </div>
           </div>
         </body>
       </html>
-    `
+    `,
   };
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log("Correo de confirmación enviado:", info.messageId);
+    console.log("Correo de confirmacion enviado:", info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error("Error al enviar correo de confirmación:", error);
+    console.error("Error al enviar correo de confirmacion:", error);
     throw error;
   }
 };
