@@ -3,18 +3,16 @@ Servicio de gestión de tipos de licencias, saldos y días festivos
 """
 
 from datetime import datetime, timedelta
-from decimal import Decimal
 from typing import List, Optional, Dict, Any
 from sqlalchemy import text
 from fastapi import HTTPException, status
 
 from app.db.session import get_connection, get_transaction
 from app.schemas.leave import (
-    LeaveTypeCreate, LeaveTypeUpdate, LeaveTypeResponse,
-    LeaveBalanceCreate, LeaveBalanceUpdate, LeaveBalanceResponse,
-    PublicHolidayCreate, PublicHolidayUpdate, PublicHolidayResponse,
-    LeaveBalanceSummary, VacationAnalyticsSummary, EmployeeVacationHistory,
-    TeamCoverageSummary
+    LeaveTypeCreate, LeaveTypeResponse,
+    LeaveBalanceCreate, LeaveBalanceResponse,
+    PublicHolidayCreate, PublicHolidayResponse,
+    LeaveBalanceSummary
 )
 
 
@@ -25,33 +23,33 @@ from app.schemas.leave import (
 async def list_leave_types(company_id: int, is_active: bool = True) -> List[LeaveTypeResponse]:
     """Obtener todos los tipos de licencia de una empresa"""
     try:
-        conn = get_connection()
-        query = """
-        SELECT 
-            LeaveType_Id,
-            Company_Id,
-            Name,
-            Description,
-            Color,
-            DefaultDays,
-            Requires_Document,
-            IsActive,
-            CreatedAt,
-            UpdatedAt
-        FROM ERP_HR_LEAVE_TYPES
-        WHERE Company_Id = :company_id
-        """
-        if is_active:
-            query += " AND IsActive = 1"
-        
-        query += " ORDER BY Name"
-        
-        result = conn.execute(text(query), {"company_id": company_id})
-        rows = result.fetchall()
-        
-        leave_types = []
-        for row in rows:
-            leave_types.append(LeaveTypeResponse(
+        with get_connection() as conn:
+            query = """
+            SELECT 
+                LeaveType_Id,
+                Company_Id,
+                Name,
+                Description,
+                Color,
+                DefaultDays,
+                Requires_Document,
+                IsActive,
+                CreatedAt,
+                UpdatedAt
+            FROM ERP_HR_LEAVE_TYPES
+            WHERE Company_Id = :company_id
+            """
+
+            if is_active:
+                query += " AND IsActive = 1"
+
+            query += " ORDER BY Name"
+
+            result = conn.execute(text(query), {"company_id": company_id})
+            rows = result.fetchall()
+
+        return [
+            LeaveTypeResponse(
                 leave_type_id=row[0],
                 company_id=row[1],
                 name=row[2],
@@ -62,9 +60,10 @@ async def list_leave_types(company_id: int, is_active: bool = True) -> List[Leav
                 is_active=row[7],
                 created_at=row[8],
                 updated_at=row[9]
-            ))
-        
-        return leave_types
+            )
+            for row in rows
+        ]
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -82,7 +81,7 @@ async def create_leave_type(data: LeaveTypeCreate) -> LeaveTypeResponse:
             VALUES (:company_id, :name, :description, :color, :default_days, :requires_document, :is_active, GETDATE(), GETDATE());
             SELECT CAST(SCOPE_IDENTITY() as int)
             """
-            
+
             result = conn.execute(text(query), {
                 "company_id": data.company_id,
                 "name": data.name,
@@ -92,13 +91,12 @@ async def create_leave_type(data: LeaveTypeCreate) -> LeaveTypeResponse:
                 "requires_document": data.requires_document,
                 "is_active": data.is_active
             })
-            
+
             leave_type_id = result.scalar()
             conn.commit()
-        
-        # Obtener y retornar
-        leave_type = await get_leave_type(leave_type_id)
-        return leave_type
+
+        return await get_leave_type(leave_type_id)
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -109,24 +107,24 @@ async def create_leave_type(data: LeaveTypeCreate) -> LeaveTypeResponse:
 async def get_leave_type(leave_type_id: int) -> LeaveTypeResponse:
     """Obtener un tipo de licencia por ID"""
     try:
-        conn = get_connection()
-        query = """
-        SELECT 
-            LeaveType_Id, Company_Id, Name, Description, Color, 
-            DefaultDays, Requires_Document, IsActive, CreatedAt, UpdatedAt
-        FROM ERP_HR_LEAVE_TYPES
-        WHERE LeaveType_Id = :leave_type_id
-        """
-        
-        result = conn.execute(text(query), {"leave_type_id": leave_type_id})
-        row = result.fetchone()
-        
+        with get_connection() as conn:
+            query = """
+            SELECT 
+                LeaveType_Id, Company_Id, Name, Description, Color, 
+                DefaultDays, Requires_Document, IsActive, CreatedAt, UpdatedAt
+            FROM ERP_HR_LEAVE_TYPES
+            WHERE LeaveType_Id = :leave_type_id
+            """
+
+            result = conn.execute(text(query), {"leave_type_id": leave_type_id})
+            row = result.fetchone()
+
         if not row:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Tipo de licencia no encontrado"
             )
-        
+
         return LeaveTypeResponse(
             leave_type_id=row[0],
             company_id=row[1],
@@ -139,6 +137,7 @@ async def get_leave_type(leave_type_id: int) -> LeaveTypeResponse:
             created_at=row[8],
             updated_at=row[9]
         )
+
     except HTTPException:
         raise
     except Exception as e:
@@ -155,34 +154,34 @@ async def get_leave_type(leave_type_id: int) -> LeaveTypeResponse:
 async def get_leave_balance(user_id: int, year: int) -> List[LeaveBalanceSummary]:
     """Obtener saldo de licencias para un empleado en un año"""
     try:
-        conn = get_connection()
-        query = """
-        SELECT 
-            LT.Name,
-            LB.AvailableDays,
-            LB.UsedDays,
-            LB.PlannedDays,
-            (LB.AvailableDays - LB.UsedDays - LB.PlannedDays) as Remaining
-        FROM ERP_HR_LEAVE_BALANCE LB
-        INNER JOIN ERP_HR_LEAVE_TYPES LT ON LB.LeaveType_Id = LT.LeaveType_Id
-        WHERE LB.User_Id = :user_id AND LB.Year = :year
-        ORDER BY LT.Name
-        """
-        
-        result = conn.execute(text(query), {"user_id": user_id, "year": year})
-        rows = result.fetchall()
-        
-        balances = []
-        for row in rows:
-            balances.append(LeaveBalanceSummary(
+        with get_connection() as conn:
+            query = """
+            SELECT 
+                LT.Name,
+                LB.AvailableDays,
+                LB.UsedDays,
+                LB.PlannedDays,
+                (LB.AvailableDays - LB.UsedDays - LB.PlannedDays) as Remaining
+            FROM ERP_HR_LEAVE_BALANCE LB
+            INNER JOIN ERP_HR_LEAVE_TYPES LT ON LB.LeaveType_Id = LT.LeaveType_Id
+            WHERE LB.User_Id = :user_id AND LB.Year = :year
+            ORDER BY LT.Name
+            """
+
+            result = conn.execute(text(query), {"user_id": user_id, "year": year})
+            rows = result.fetchall()
+
+        return [
+            LeaveBalanceSummary(
                 leave_type=row[0],
                 available_days=row[1],
                 used_days=row[2],
                 planned_days=row[3],
                 remaining=row[4]
-            ))
-        
-        return balances
+            )
+            for row in rows
+        ]
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -202,7 +201,7 @@ async def create_leave_balance(data: LeaveBalanceCreate) -> LeaveBalanceResponse
                     :planned_days, :carry_over_days, :negative_balance_allowed, GETDATE(), GETDATE());
             SELECT CAST(SCOPE_IDENTITY() as int)
             """
-            
+
             result = conn.execute(text(query), {
                 "user_id": data.user_id,
                 "leave_type_id": data.leave_type_id,
@@ -213,12 +212,12 @@ async def create_leave_balance(data: LeaveBalanceCreate) -> LeaveBalanceResponse
                 "carry_over_days": data.carry_over_days,
                 "negative_balance_allowed": data.negative_balance_allowed
             })
-            
+
             balance_id = result.scalar()
             conn.commit()
-        
-        balance = await get_leave_balance_by_id(balance_id)
-        return balance
+
+        return await get_leave_balance_by_id(balance_id)
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -229,25 +228,25 @@ async def create_leave_balance(data: LeaveBalanceCreate) -> LeaveBalanceResponse
 async def get_leave_balance_by_id(balance_id: int) -> LeaveBalanceResponse:
     """Obtener saldo de licencias por ID"""
     try:
-        conn = get_connection()
-        query = """
-        SELECT 
-            Balance_Id, User_Id, LeaveType_Id, Year, AvailableDays, UsedDays, 
-            PlannedDays, CarryOverDays, NegativeBalanceAllowed, LastAccrualDate, 
-            Notes, CreatedAt, UpdatedAt
-        FROM ERP_HR_LEAVE_BALANCE
-        WHERE Balance_Id = :balance_id
-        """
-        
-        result = conn.execute(text(query), {"balance_id": balance_id})
-        row = result.fetchone()
-        
+        with get_connection() as conn:
+            query = """
+            SELECT 
+                Balance_Id, User_Id, LeaveType_Id, Year, AvailableDays, UsedDays, 
+                PlannedDays, CarryOverDays, NegativeBalanceAllowed, LastAccrualDate, 
+                Notes, CreatedAt, UpdatedAt
+            FROM ERP_HR_LEAVE_BALANCE
+            WHERE Balance_Id = :balance_id
+            """
+
+            result = conn.execute(text(query), {"balance_id": balance_id})
+            row = result.fetchone()
+
         if not row:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Saldo de licencias no encontrado"
             )
-        
+
         return LeaveBalanceResponse(
             balance_id=row[0],
             user_id=row[1],
@@ -263,6 +262,7 @@ async def get_leave_balance_by_id(balance_id: int) -> LeaveBalanceResponse:
             created_at=row[11],
             updated_at=row[12]
         )
+
     except HTTPException:
         raise
     except Exception as e:
@@ -279,29 +279,28 @@ async def get_leave_balance_by_id(balance_id: int) -> LeaveBalanceResponse:
 async def get_public_holidays(company_id: int, year: Optional[int] = None) -> List[PublicHolidayResponse]:
     """Obtener días festivos de una empresa"""
     try:
-        conn = get_connection()
-        query = """
-        SELECT 
-            Holiday_Id, Company_Id, HolidayDate, Name, Description, IsObligatory, 
-            IsRecurring, RecurringMonth, RecurringDay, CreatedAt, UpdatedAt
-        FROM ERP_COMPANY_PUBLIC_HOLIDAYS
-        WHERE Company_Id = :company_id
-        """
-        
-        params = {"company_id": company_id}
-        
-        if year:
-            query += " AND YEAR(HolidayDate) = :year"
-            params["year"] = year
-        
-        query += " ORDER BY HolidayDate"
-        
-        result = conn.execute(text(query), params)
-        rows = result.fetchall()
-        
-        holidays = []
-        for row in rows:
-            holidays.append(PublicHolidayResponse(
+        with get_connection() as conn:
+            query = """
+            SELECT 
+                Holiday_Id, Company_Id, HolidayDate, Name, Description, IsObligatory, 
+                IsRecurring, RecurringMonth, RecurringDay, CreatedAt, UpdatedAt
+            FROM ERP_COMPANY_PUBLIC_HOLIDAYS
+            WHERE Company_Id = :company_id
+            """
+
+            params = {"company_id": company_id}
+
+            if year:
+                query += " AND YEAR(HolidayDate) = :year"
+                params["year"] = year
+
+            query += " ORDER BY HolidayDate"
+
+            result = conn.execute(text(query), params)
+            rows = result.fetchall()
+
+        return [
+            PublicHolidayResponse(
                 holiday_id=row[0],
                 company_id=row[1],
                 holiday_date=row[2],
@@ -313,9 +312,10 @@ async def get_public_holidays(company_id: int, year: Optional[int] = None) -> Li
                 recurring_day=row[8],
                 created_at=row[9],
                 updated_at=row[10]
-            ))
-        
-        return holidays
+            )
+            for row in rows
+        ]
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -335,7 +335,7 @@ async def create_public_holiday(data: PublicHolidayCreate) -> PublicHolidayRespo
                     :is_recurring, :recurring_month, :recurring_day, GETDATE(), GETDATE());
             SELECT CAST(SCOPE_IDENTITY() as int)
             """
-            
+
             result = conn.execute(text(query), {
                 "company_id": data.company_id,
                 "holiday_date": data.holiday_date,
@@ -346,12 +346,12 @@ async def create_public_holiday(data: PublicHolidayCreate) -> PublicHolidayRespo
                 "recurring_month": data.recurring_month,
                 "recurring_day": data.recurring_day
             })
-            
+
             holiday_id = result.scalar()
             conn.commit()
-        
-        holiday = await get_public_holiday(holiday_id)
-        return holiday
+
+        return await get_public_holiday(holiday_id)
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -362,24 +362,24 @@ async def create_public_holiday(data: PublicHolidayCreate) -> PublicHolidayRespo
 async def get_public_holiday(holiday_id: int) -> PublicHolidayResponse:
     """Obtener un día festivo por ID"""
     try:
-        conn = get_connection()
-        query = """
-        SELECT 
-            Holiday_Id, Company_Id, HolidayDate, Name, Description, IsObligatory, 
-            IsRecurring, RecurringMonth, RecurringDay, CreatedAt, UpdatedAt
-        FROM ERP_COMPANY_PUBLIC_HOLIDAYS
-        WHERE Holiday_Id = :holiday_id
-        """
-        
-        result = conn.execute(text(query), {"holiday_id": holiday_id})
-        row = result.fetchone()
-        
+        with get_connection() as conn:
+            query = """
+            SELECT 
+                Holiday_Id, Company_Id, HolidayDate, Name, Description, IsObligatory, 
+                IsRecurring, RecurringMonth, RecurringDay, CreatedAt, UpdatedAt
+            FROM ERP_COMPANY_PUBLIC_HOLIDAYS
+            WHERE Holiday_Id = :holiday_id
+            """
+
+            result = conn.execute(text(query), {"holiday_id": holiday_id})
+            row = result.fetchone()
+
         if not row:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Día festivo no encontrado"
             )
-        
+
         return PublicHolidayResponse(
             holiday_id=row[0],
             company_id=row[1],
@@ -393,6 +393,7 @@ async def get_public_holiday(holiday_id: int) -> PublicHolidayResponse:
             created_at=row[9],
             updated_at=row[10]
         )
+
     except HTTPException:
         raise
     except Exception as e:
@@ -407,61 +408,48 @@ async def get_public_holiday(holiday_id: int) -> PublicHolidayResponse:
 # ============================================================================
 
 async def is_working_day(date: datetime, company_id: int) -> bool:
-    """Verificar si una fecha es día laboral (no es fin de semana ni festivo)"""
-    # Verificar si es fin de semana (5=Sábado, 6=Domingo)
+    """Verificar si una fecha es día laboral"""
     if date.weekday() >= 5:
         return False
-    
-    # Verificar si es día festivo
+
     holidays = await get_public_holidays(company_id, date.year)
+
     for holiday in holidays:
         if holiday.holiday_date.date() == date.date():
             return False
-    
+
     return True
 
 
 async def calculate_working_days(
-    start_date: datetime, 
-    end_date: datetime, 
+    start_date: datetime,
+    end_date: datetime,
     company_id: int,
     include_weekends: bool = False
 ) -> int:
-    """
-    Calcular días laborales entre dos fechas
-    
-    Args:
-        start_date: Fecha de inicio
-        end_date: Fecha de fin
-        company_id: ID de la empresa (para consultar festivos)
-        include_weekends: Si incluir fines de semana
-    
-    Returns:
-        Número de días laborales
-    """
+    """Calcular días laborales entre dos fechas"""
     try:
         current = start_date
         working_days = 0
-        
-        # Obtener festivos del año
+
         holidays = await get_public_holidays(company_id, start_date.year)
         holiday_dates = {h.holiday_date.date() for h in holidays}
-        
+
         while current <= end_date:
-            # Verificar si es día laboral
             is_weekend = current.weekday() >= 5
             is_holiday = current.date() in holiday_dates
-            
+
             if include_weekends:
                 if not is_holiday:
                     working_days += 1
             else:
                 if not is_weekend and not is_holiday:
                     working_days += 1
-            
+
             current += timedelta(days=1)
-        
+
         return working_days
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -477,27 +465,27 @@ async def check_balance_availability(
 ) -> Dict[str, Any]:
     """Verificar disponibilidad de saldo para solicitar licencia"""
     try:
-        conn = get_connection()
-        query = """
-        SELECT 
-            AvailableDays,
-            UsedDays,
-            PlannedDays,
-            NegativeBalanceAllowed
-        FROM ERP_HR_LEAVE_BALANCE
-        WHERE User_Id = :user_id 
-            AND LeaveType_Id = :leave_type_id 
-            AND Year = :year
-        """
-        
-        result = conn.execute(text(query), {
-            "user_id": user_id,
-            "leave_type_id": leave_type_id,
-            "year": year
-        })
-        
-        row = result.fetchone()
-        
+        with get_connection() as conn:
+            query = """
+            SELECT 
+                AvailableDays,
+                UsedDays,
+                PlannedDays,
+                NegativeBalanceAllowed
+            FROM ERP_HR_LEAVE_BALANCE
+            WHERE User_Id = :user_id 
+                AND LeaveType_Id = :leave_type_id 
+                AND Year = :year
+            """
+
+            result = conn.execute(text(query), {
+                "user_id": user_id,
+                "leave_type_id": leave_type_id,
+                "year": year
+            })
+
+            row = result.fetchone()
+
         if not row:
             return {
                 "available": False,
@@ -506,28 +494,30 @@ async def check_balance_availability(
                 "days_requested": days_requested,
                 "days_remaining": 0
             }
-        
-        available_days = row[0]
-        used_days = row[1]
-        planned_days = row[2]
-        negative_allowed = row[3]
-        
+
+        available_days = float(row[0] or 0)
+        used_days = float(row[1] or 0)
+        planned_days = float(row[2] or 0)
+        negative_allowed = bool(row[3])
+
         remaining = available_days - used_days - planned_days
-        
-        can_use = remaining >= days_requested or (
-            remaining + negative_allowed >= days_requested
-        )
-        
+
+        if negative_allowed:
+            can_use = True
+        else:
+            can_use = remaining >= days_requested
+
         return {
             "available": can_use,
             "reason": "OK" if can_use else "Saldo insuficiente",
             "days_available": available_days,
             "days_used": used_days,
             "days_planned": planned_days,
-            "days_remaining": max(0, remaining),
+            "days_remaining": remaining,
             "days_requested": days_requested,
             "negative_allowed": negative_allowed
         }
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
