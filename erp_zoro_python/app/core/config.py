@@ -77,12 +77,13 @@ class Settings:
     redis_port: int = 6379
     redis_password: str | None = None
     redis_db: int = 0
-
+    environment: str = "development"
     @classmethod
     def from_env(cls) -> "Settings":
         return cls(
             app_name=os.getenv("ERP_APP_NAME", "ERP Zoro Python"),
             api_prefix=os.getenv("ERP_API_PREFIX", "/api"),
+            environment=os.getenv("ERP_ENVIRONMENT", "development").lower(),
             sqlserver_host=os.getenv("ERP_SQLSERVER_HOST", "localhost"),
             sqlserver_port=int(os.getenv("ERP_SQLSERVER_PORT", "1433")),
             sqlserver_database=os.getenv("ERP_SQLSERVER_DATABASE", "ERP"),

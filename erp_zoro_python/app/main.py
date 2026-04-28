@@ -8,7 +8,6 @@ import socketio as _socketio
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 
 from app.api.router_utils import SlashAgnosticAPIRouter
 from app.core.config import settings
@@ -38,13 +37,27 @@ _fastapi_app = FastAPI(
     description="Backend Python para ERP Zoro basado en la estructura del ERP actual.",
 )
 
+if settings.environment == "production" and not settings.frontend_origins:
+    raise RuntimeError(
+        "ERP_FRONTEND_ORIGINS es obligatorio en production. "
+        "Ejemplo: ERP_FRONTEND_ORIGINS=https://erp.tudominio.com"
+    )
+
+allow_origin_regex = None if settings.environment == "production" else _LOCAL_NETWORK_ORIGIN_REGEX
+
 _fastapi_app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.frontend_origins or ["*"],
-    allow_origin_regex=_LOCAL_NETWORK_ORIGIN_REGEX,
+    allow_origins=settings.frontend_origins,
+    allow_origin_regex=allow_origin_regex,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+    ],
 )
 
 _fastapi_app.include_router(api_router, prefix=settings.api_prefix)
@@ -52,12 +65,6 @@ _fastapi_app.include_router(api_router, prefix=settings.api_prefix)
 uploads_dir = Path(__file__).resolve().parents[1] / "uploads"
 uploads_dir.mkdir(parents=True, exist_ok=True)
 (uploads_dir / "chat").mkdir(parents=True, exist_ok=True)
-_fastapi_app.mount("/uploads", StaticFiles(directory=uploads_dir, check_dir=False), name="uploads")
-_fastapi_app.mount(
-    "/api/uploads",
-    StaticFiles(directory=uploads_dir, check_dir=False),
-    name="api-uploads",
-)
 
 
 @_fastapi_app.exception_handler(ApiServiceError)

@@ -70,6 +70,7 @@ from app.api.routes import (
     fleet,
     surveys,
     subscriptions,
+    uploads,
 )
 
 
@@ -138,3 +139,4 @@ api_router.include_router(marketing.router, prefix="/marketing", tags=["marketin
 api_router.include_router(fleet.router, prefix="/flotilla", tags=["fleet"])
 api_router.include_router(surveys.router, prefix="/encuestas", tags=["surveys"])
 api_router.include_router(subscriptions.router, prefix="/suscripciones", tags=["subscriptions"])
+api_router.include_router(uploads.router, prefix="/files", tags=["uploads"])
