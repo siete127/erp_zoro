@@ -113,7 +113,8 @@ export default function VacacionesCalendar({ currentUser, onCreateClick }) {
         const month = currentDate.getMonth() + 1;
         const startDate = `${currentDate.getFullYear()}-${String(month).padStart(2, '0')}-01`;
         const endDate = `${currentDate.getFullYear()}-${String(month).padStart(2, '0')}-${new Date(currentDate.getFullYear(), month, 0).getDate()}`;
-        const data = await leaveService.getApprovedVacations(currentUser?.company_id, startDate, endDate);
+        const cid = currentUser?.companies?.[0] || currentUser?.Company_Id || currentUser?.company_id;
+        const data = await leaveService.getApprovedVacations(cid, startDate, endDate);
         setVacaciones(Array.isArray(data) ? data : []);
         setUseMockData(false);
       } catch {

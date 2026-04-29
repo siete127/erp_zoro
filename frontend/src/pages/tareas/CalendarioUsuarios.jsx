@@ -74,8 +74,10 @@ function estadoKey(estado) {
 
 export default function CalendarioUsuarios() {
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-  const isAdmin = currentUser?.isAdmin || currentUser?.is_admin || currentUser?.RolId === 2 || currentUser?.RolId === 1;
-  const companyId = currentUser?.Company_Id || currentUser?.company_id;
+  const isAdmin = currentUser?.is_admin || currentUser?.isAdmin || currentUser?.RolId <= 2;
+  const companyId = currentUser?.companies?.[0]
+    || currentUser?.Company_Id
+    || currentUser?.company_id;
 
   const [vista, setVista] = useState('mis');
   const [usuarios, setUsuarios] = useState([]);
