@@ -7,6 +7,10 @@ const {
   registrarRecepcionProduccion,
   cancelarRecepcionProduccion,
 } = require("../services/inventoryControlService");
+const {
+  ensureCostTables,
+  resolveCompanyScope,
+} = require("../services/inventoryValuationService");
 
 // Helper: obtener stock actual para un producto/almacén
 async function getCurrentStock(productoId, almacenId, transaction) {
@@ -27,6 +31,127 @@ async function getCurrentStock(productoId, almacenId, transaction) {
   const row = result.recordset[0];
   return { cantidad: Number(row.Cantidad || 0), stockMinimo: Number(row.Stock_Minimo || 0) };
 }
+
+function buildTargetStock(stockMinimo, stockActual) {
+  const minimo = Number(stockMinimo || 0);
+  const actual = Number(stockActual || 0);
+  if (minimo <= 0 || actual >= minimo) return 0;
+  return Number(Math.max(minimo - actual, minimo * 2 - actual).toFixed(2));
+}
+
+// GET /api/inventario/planeacion/resumen
+exports.getPlaneacionResumen = async (req, res) => {
+  try {
+    await ensureCostTables();
+    const { request, clause } = resolveCompanyScope(req, 'a');
+
+    const result = await request.query(`
+      WITH stock_base AS (
+        SELECT
+          s.Producto_Id,
+          a.Company_Id,
+          SUM(ISNULL(s.Cantidad, 0)) AS StockActual,
+          SUM(ISNULL(s.Stock_Minimo, 0)) AS StockMinimo,
+          MAX(ISNULL(cp.CostoPromedio, p.CostoInicial)) AS CostoPromedio
+        FROM ERP_STOCK s
+        INNER JOIN ERP_ALMACENES a ON a.Almacen_Id = s.Almacen_Id
+        INNER JOIN ERP_PRODUCTOS p ON p.Producto_Id = s.Producto_Id
+        LEFT JOIN ERP_PRODUCTO_COSTEO_PROMEDIO cp
+          ON cp.Producto_Id = s.Producto_Id
+         AND (cp.Company_Id = a.Company_Id OR cp.Company_Id IS NULL)
+        WHERE 1 = 1 ${clause}
+        GROUP BY s.Producto_Id, a.Company_Id
+      )
+      SELECT
+        COUNT(*) AS ProductosEvaluados,
+        SUM(CASE WHEN StockActual < StockMinimo AND StockMinimo > 0 THEN 1 ELSE 0 END) AS ProductosBajoMinimo,
+        SUM(StockActual * ISNULL(CostoPromedio, 0)) AS ValorInventario,
+        SUM(
+          CASE
+            WHEN StockActual < StockMinimo AND StockMinimo > 0
+              THEN (CASE WHEN (StockMinimo * 2 - StockActual) > (StockMinimo - StockActual)
+                         THEN (StockMinimo * 2 - StockActual)
+                         ELSE (StockMinimo - StockActual)
+                    END) * ISNULL(CostoPromedio, 0)
+            ELSE 0
+          END
+        ) AS CostoReabastecimientoSugerido
+      FROM stock_base;
+    `);
+
+    const summary = result.recordset?.[0] || {};
+    res.json({
+      data: {
+        ProductosEvaluados: Number(summary.ProductosEvaluados || 0),
+        ProductosBajoMinimo: Number(summary.ProductosBajoMinimo || 0),
+        ValorInventario: Number(summary.ValorInventario || 0),
+        CostoReabastecimientoSugerido: Number(summary.CostoReabastecimientoSugerido || 0),
+      },
+    });
+  } catch (err) {
+    console.error('inventario.getPlaneacionResumen error', err);
+    res.status(500).json({ msg: 'Error al obtener el resumen de planeacion', error: err.message });
+  }
+};
+
+// GET /api/inventario/planeacion/reabastecimiento
+exports.listReabastecimiento = async (req, res) => {
+  try {
+    await ensureCostTables();
+    const { request, clause } = resolveCompanyScope(req, 'a');
+    const { search = '' } = req.query || {};
+
+    let filterSearch = '';
+    if (search) {
+      request.input('Search', sql.NVarChar(200), `%${search}%`);
+      filterSearch = ' AND (p.SKU LIKE @Search OR p.Nombre LIKE @Search)';
+    }
+
+    const result = await request.query(`
+      SELECT
+        s.Producto_Id,
+        a.Company_Id,
+        c.NameCompany,
+        p.SKU,
+        p.Nombre,
+        SUM(ISNULL(s.Cantidad, 0)) AS StockActual,
+        SUM(ISNULL(s.Stock_Minimo, 0)) AS StockMinimo,
+        MAX(ISNULL(cp.CostoPromedio, p.CostoInicial)) AS CostoPromedio
+      FROM ERP_STOCK s
+      INNER JOIN ERP_ALMACENES a ON a.Almacen_Id = s.Almacen_Id
+      INNER JOIN ERP_COMPANY c ON c.Company_Id = a.Company_Id
+      INNER JOIN ERP_PRODUCTOS p ON p.Producto_Id = s.Producto_Id
+      LEFT JOIN ERP_PRODUCTO_COSTEO_PROMEDIO cp
+        ON cp.Producto_Id = s.Producto_Id
+       AND (cp.Company_Id = a.Company_Id OR cp.Company_Id IS NULL)
+      WHERE 1 = 1 ${clause} ${filterSearch}
+      GROUP BY s.Producto_Id, a.Company_Id, c.NameCompany, p.SKU, p.Nombre
+      HAVING SUM(ISNULL(s.Cantidad, 0)) < SUM(ISNULL(s.Stock_Minimo, 0))
+         AND SUM(ISNULL(s.Stock_Minimo, 0)) > 0
+      ORDER BY c.NameCompany, p.Nombre;
+    `);
+
+    const data = (result.recordset || []).map((row) => {
+      const stockActual = Number(row.StockActual || 0);
+      const stockMinimo = Number(row.StockMinimo || 0);
+      const costoPromedio = Number(row.CostoPromedio || 0);
+      const cantidadSugerida = buildTargetStock(stockMinimo, stockActual);
+      return {
+        ...row,
+        StockActual: stockActual,
+        StockMinimo: stockMinimo,
+        CostoPromedio: costoPromedio,
+        CantidadSugerida: cantidadSugerida,
+        CostoReabastecimiento: Number((cantidadSugerida * costoPromedio).toFixed(2)),
+      };
+    });
+
+    res.json({ data });
+  } catch (err) {
+    console.error('inventario.listReabastecimiento error', err);
+    res.status(500).json({ msg: 'Error al obtener sugerencias de reabastecimiento', error: err.message });
+  }
+};
 
 // GET /api/inventario - Listado de stock por producto/almacén
 exports.listStock = async (req, res) => {

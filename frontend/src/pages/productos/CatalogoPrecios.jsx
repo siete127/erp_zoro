@@ -29,6 +29,17 @@ export default function CatalogoPrecios() {
   const [codigoAprobacion, setCodigoAprobacion] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
+  const [productoEscalas, setProductoEscalas] = useState(null);
+  const [niveles, setNiveles] = useState([]);
+  const [guardandoNivel, setGuardandoNivel] = useState(false);
+  const [nivelForm, setNivelForm] = useState({
+    PrecioNivel_Id: null,
+    NombreLista: 'Mayoreo',
+    CantidadMinima: '1',
+    CantidadMaxima: '',
+    DescuentoPct: '0',
+    PrecioFijo: '',
+  });
 
   const fetchProductos = async () => {
     setLoading(true);
@@ -55,6 +66,15 @@ export default function CatalogoPrecios() {
     fetchProductos();
     fetchSolicitudes();
   }, []);
+
+  const fetchNiveles = async (productoId) => {
+    try {
+      const res = await api.get(`/precios/niveles?productoId=${productoId}`);
+      setNiveles(res.data || []);
+    } catch {
+      notify('Error cargando escalas de precio', 'error');
+    }
+  };
 
   const abrirSolicitud = (producto) => {
     setProductoSeleccionado(producto);
@@ -111,6 +131,66 @@ export default function CatalogoPrecios() {
       fetchSolicitudes();
     } catch (err) {
       notify(err.response?.data?.msg || 'Error al eliminar solicitud', 'error');
+    }
+  };
+
+  const seleccionarProductoEscalas = (producto) => {
+    setProductoEscalas(producto);
+    setNivelForm({
+      PrecioNivel_Id: null,
+      NombreLista: 'Mayoreo',
+      CantidadMinima: '1',
+      CantidadMaxima: '',
+      DescuentoPct: '0',
+      PrecioFijo: '',
+    });
+    fetchNiveles(producto.Producto_Id);
+  };
+
+  const guardarNivel = async (e) => {
+    e.preventDefault();
+    if (!productoEscalas) return;
+    setGuardandoNivel(true);
+    try {
+      await api.post('/precios/niveles', {
+        ...nivelForm,
+        Producto_Id: productoEscalas.Producto_Id,
+      });
+      notify('Escala guardada', 'success');
+      setNivelForm({
+        PrecioNivel_Id: null,
+        NombreLista: 'Mayoreo',
+        CantidadMinima: '1',
+        CantidadMaxima: '',
+        DescuentoPct: '0',
+        PrecioFijo: '',
+      });
+      fetchNiveles(productoEscalas.Producto_Id);
+    } catch (err) {
+      notify(err.response?.data?.msg || 'Error al guardar escala', 'error');
+    } finally {
+      setGuardandoNivel(false);
+    }
+  };
+
+  const editarNivel = (nivel) => {
+    setNivelForm({
+      PrecioNivel_Id: nivel.PrecioNivel_Id,
+      NombreLista: nivel.NombreLista || '',
+      CantidadMinima: String(nivel.CantidadMinima ?? '1'),
+      CantidadMaxima: nivel.CantidadMaxima ?? '',
+      DescuentoPct: String(nivel.DescuentoPct ?? '0'),
+      PrecioFijo: nivel.PrecioFijo ?? '',
+    });
+  };
+
+  const eliminarNivel = async (nivelId) => {
+    try {
+      await api.delete(`/precios/niveles/${nivelId}`);
+      notify('Escala eliminada', 'success');
+      if (productoEscalas) fetchNiveles(productoEscalas.Producto_Id);
+    } catch (err) {
+      notify(err.response?.data?.msg || 'Error al eliminar escala', 'error');
     }
   };
 
@@ -254,12 +334,20 @@ export default function CatalogoPrecios() {
                         ${Number(p.Precio ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-3 pr-6 text-center">
-                        <button
-                          onClick={() => abrirSolicitud(p)}
-                          className="rounded-[10px] border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
-                        >
-                          Solicitar cambio
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => seleccionarProductoEscalas(p)}
+                            className="rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                          >
+                            Escalas
+                          </button>
+                          <button
+                            onClick={() => abrirSolicitud(p)}
+                            className="rounded-[10px] border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+                          >
+                            Solicitar cambio
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -268,6 +356,79 @@ export default function CatalogoPrecios() {
             </div>
           )}
         </div>
+
+        {productoEscalas && (
+          <div className="rounded-[28px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(245,248,255,0.9)_100%)] shadow-[0_18px_40px_rgba(15,45,93,0.10)] overflow-hidden">
+            <div className="border-b border-[#eaf0fa] px-6 py-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#3b6fd4]">Fase 6</p>
+                <h2 className="text-lg font-bold text-[#0d1f3c]">Descuentos volumetricos y listas de precios</h2>
+                <p className="text-sm text-slate-500">{productoEscalas.SKU} · {productoEscalas.Nombre}</p>
+              </div>
+              <button onClick={() => setProductoEscalas(null)} className="text-sm text-slate-400 hover:text-slate-600">Cerrar</button>
+            </div>
+            <div className="grid gap-5 p-6 lg:grid-cols-[0.9fr_1.1fr]">
+              <form onSubmit={guardarNivel} className="space-y-4">
+                <Field label="Lista">
+                  <input value={nivelForm.NombreLista} onChange={(e) => setNivelForm({ ...nivelForm, NombreLista: e.target.value })} className={premiumFieldClass} />
+                </Field>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Cantidad minima">
+                    <input type="number" step="0.01" value={nivelForm.CantidadMinima} onChange={(e) => setNivelForm({ ...nivelForm, CantidadMinima: e.target.value })} className={premiumFieldClass} />
+                  </Field>
+                  <Field label="Cantidad maxima">
+                    <input type="number" step="0.01" value={nivelForm.CantidadMaxima} onChange={(e) => setNivelForm({ ...nivelForm, CantidadMaxima: e.target.value })} className={premiumFieldClass} />
+                  </Field>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Descuento %">
+                    <input type="number" step="0.01" value={nivelForm.DescuentoPct} onChange={(e) => setNivelForm({ ...nivelForm, DescuentoPct: e.target.value })} className={premiumFieldClass} />
+                  </Field>
+                  <Field label="Precio fijo opcional">
+                    <input type="number" step="0.01" value={nivelForm.PrecioFijo} onChange={(e) => setNivelForm({ ...nivelForm, PrecioFijo: e.target.value })} className={premiumFieldClass} />
+                  </Field>
+                </div>
+                <button type="submit" disabled={guardandoNivel} className="rounded-[14px] bg-gradient-to-r from-[#1b3d86] to-[#2a5fc4] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(27,61,134,0.30)]">
+                  {guardandoNivel ? 'Guardando...' : (nivelForm.PrecioNivel_Id ? 'Actualizar escala' : 'Agregar escala')}
+                </button>
+              </form>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-[#eaf0fa]">
+                      {['Lista', 'Rango', 'Descuento', 'Precio fijo', 'Acciones'].map(col => (
+                        <th key={col} className="px-3 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#6b7a96]">
+                          {col}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {niveles.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-3 py-8 text-center text-sm text-slate-400">Aun no hay escalas para este producto.</td>
+                      </tr>
+                    ) : niveles.map((nivel) => (
+                      <tr key={nivel.PrecioNivel_Id} className="border-t border-[#eaf0fa]">
+                        <td className="px-3 py-3 text-sm font-medium text-slate-800">{nivel.NombreLista}</td>
+                        <td className="px-3 py-3 text-sm text-slate-600">{nivel.CantidadMinima} - {nivel.CantidadMaxima || 'sin tope'}</td>
+                        <td className="px-3 py-3 text-sm text-slate-600">{Number(nivel.DescuentoPct || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}%</td>
+                        <td className="px-3 py-3 text-sm text-slate-600">{nivel.PrecioFijo ? `$${Number(nivel.PrecioFijo).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '—'}</td>
+                        <td className="px-3 py-3">
+                          <div className="flex gap-2">
+                            <button onClick={() => editarNivel(nivel)} className="rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">Editar</button>
+                            <button onClick={() => eliminarNivel(nivel.PrecioNivel_Id)} className="rounded-[10px] border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">Eliminar</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
 

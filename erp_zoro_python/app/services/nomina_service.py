@@ -7,7 +7,13 @@ from sqlalchemy import text
 
 from app.db.session import get_connection, get_transaction
 from app.services import ledger_service
+from app.services.sat_tablas_2024 import calcular_impuestos_periodo
 from app.utils.company_access import build_in_clause, can_access_company, user_company_ids
+
+# Importado aquí para evitar circular imports (facturama_service importa get_connection)
+def _get_facturama():
+    from app.services import facturama_service
+    return facturama_service
 
 
 # ---------- helpers ----------
@@ -274,17 +280,29 @@ def create_nomina(payload: dict[str, Any], current_user: dict[str, Any]) -> dict
             {"cid": company_id},
         ).mappings().all()
 
+        dias = int(payload.get("DiasLaborados", 15))
         for emp in empleados:
-            dias = payload.get("DiasLaborados", 15)
+            sdi = float(emp.get("SalarioDiarioIntegrado") or emp["SalarioBase"] / 30)
             percepciones = round(float(emp["SalarioBase"]) / 30 * dias, 2)
-            neto = percepciones
-            conn.execute(
+            impuestos = calcular_impuestos_periodo(percepciones, sdi, dias)
+            deducciones = impuestos["TotalDeducciones"]
+            neto = round(percepciones - deducciones, 2)
+            linea_id = conn.execute(
                 text("""
                     INSERT INTO ERP_NOI_NOMINA_LINEAS (Nomina_Id, Empleado_Id, Percepciones, Deducciones, Neto)
-                    VALUES (:nomina_id, :empleado_id, :percepciones, 0, :neto)
+                    OUTPUT INSERTED.NominaLinea_Id
+                    VALUES (:nomina_id, :empleado_id, :percepciones, :deducciones, :neto)
                 """),
-                {"nomina_id": nomina_id, "empleado_id": emp["Empleado_Id"], "percepciones": percepciones, "neto": neto},
-            )
+                {
+                    "nomina_id": nomina_id,
+                    "empleado_id": emp["Empleado_Id"],
+                    "percepciones": percepciones,
+                    "deducciones": deducciones,
+                    "neto": neto,
+                },
+            ).scalar()
+            # Desglose en ERP_NOI_NOMINA_DETALLE
+            _insertar_detalle(conn, linea_id, percepciones, impuestos)
 
         # Recalcular totales
         totales = conn.execute(
@@ -358,6 +376,239 @@ def cerrar_nomina(nomina_id: int, current_user: dict[str, Any]) -> dict[str, Any
             except Exception:
                 pass  # best-effort
     return {"success": True, "message": "Nómina cerrada correctamente"}
+
+
+def _insertar_detalle(conn: Any, linea_id: int, percepciones: float, impuestos: dict) -> None:
+    """Persiste el desglose ISR/IMSS/SubsidioEmpleo en ERP_NOI_NOMINA_DETALLE."""
+    conceptos = [
+        ("001", "Sueldo", percepciones, percepciones, 0.0),
+        ("ISR", "ISR retenido", -impuestos["ISR"], 0.0, impuestos["ISR"]),
+        ("IMSS", "Cuota IMSS empleado", -impuestos["IMSS"], 0.0, impuestos["IMSS"]),
+    ]
+    if impuestos.get("SubsidioEmpleo", 0) > 0:
+        conceptos.append(("SUB", "Subsidio al empleo", impuestos["SubsidioEmpleo"], 0.0, 0.0))
+
+    for clave, desc, importe, gravado, exento in conceptos:
+        conn.execute(
+            text("""
+                INSERT INTO ERP_NOI_NOMINA_DETALLE (NominaLinea_Id, Concepto_Id, Importe, Gravado, Exento)
+                SELECT :linea_id,
+                       ISNULL((SELECT TOP 1 Concepto_Id FROM ERP_NOI_CONCEPTOS WHERE Clave=:clave), NULL),
+                       :importe, :gravado, :exento
+            """),
+            {"linea_id": linea_id, "clave": clave, "importe": importe, "gravado": gravado, "exento": exento},
+        )
+
+
+def calcular_nomina(nomina_id: int, current_user: dict[str, Any]) -> dict[str, Any]:
+    """Recalcula ISR e IMSS de todas las líneas de una nómina en BORRADOR."""
+    with get_connection() as conn:
+        nom = conn.execute(
+            text("SELECT Company_Id, Estatus, PeriodoInicio, PeriodoFin FROM ERP_NOI_NOMINAS WHERE Nomina_Id=:id"),
+            {"id": nomina_id},
+        ).mappings().first()
+    if not nom:
+        raise HTTPException(status_code=404, detail="Nómina no encontrada")
+    _check_company(current_user, int(nom["Company_Id"]))
+    if nom["Estatus"] == "CERRADA":
+        raise HTTPException(status_code=400, detail="No se puede recalcular una nómina cerrada")
+
+    with get_connection() as conn:
+        lineas = conn.execute(
+            text("""
+                SELECT l.NominaLinea_Id, l.Percepciones,
+                       ISNULL(e.SalarioDiarioIntegrado, e.SalarioBase/30) AS SDI
+                FROM ERP_NOI_NOMINA_LINEAS l
+                JOIN ERP_NOI_EMPLEADOS e ON e.Empleado_Id = l.Empleado_Id
+                WHERE l.Nomina_Id = :id
+            """),
+            {"id": nomina_id},
+        ).mappings().all()
+
+    # Calcular días del período
+    from datetime import date
+    try:
+        fi = date.fromisoformat(str(nom["PeriodoInicio"])[:10])
+        ff = date.fromisoformat(str(nom["PeriodoFin"])[:10])
+        dias = max(1, (ff - fi).days + 1)
+    except Exception:
+        dias = 15
+
+    actualizadas = 0
+    with get_transaction() as conn:
+        # Borrar detalle previo
+        conn.execute(
+            text("""
+                DELETE FROM ERP_NOI_NOMINA_DETALLE
+                WHERE NominaLinea_Id IN (
+                    SELECT NominaLinea_Id FROM ERP_NOI_NOMINA_LINEAS WHERE Nomina_Id=:id
+                )
+            """),
+            {"id": nomina_id},
+        )
+
+        for linea in lineas:
+            percepciones = float(linea["Percepciones"] or 0)
+            sdi = float(linea["SDI"] or 0)
+            impuestos = calcular_impuestos_periodo(percepciones, sdi, dias)
+            deducciones = impuestos["TotalDeducciones"]
+            neto = round(percepciones - deducciones, 2)
+
+            conn.execute(
+                text("""
+                    UPDATE ERP_NOI_NOMINA_LINEAS
+                    SET Deducciones=:d, Neto=:n
+                    WHERE NominaLinea_Id=:id
+                """),
+                {"id": linea["NominaLinea_Id"], "d": deducciones, "n": neto},
+            )
+            _insertar_detalle(conn, int(linea["NominaLinea_Id"]), percepciones, impuestos)
+            actualizadas += 1
+
+        # Recalcular totales
+        totales = conn.execute(
+            text("SELECT SUM(Percepciones) AS tp, SUM(Deducciones) AS td, SUM(Neto) AS tn FROM ERP_NOI_NOMINA_LINEAS WHERE Nomina_Id=:id"),
+            {"id": nomina_id},
+        ).mappings().first()
+        conn.execute(
+            text("UPDATE ERP_NOI_NOMINAS SET TotalPercepciones=:tp, TotalDeducciones=:td, TotalNeto=:tn WHERE Nomina_Id=:id"),
+            {"id": nomina_id, "tp": float(totales["tp"] or 0), "td": float(totales["td"] or 0), "tn": float(totales["tn"] or 0)},
+        )
+
+    return {"success": True, "message": f"Impuestos calculados para {actualizadas} empleados", "data": {"lineas": actualizadas}}
+
+
+def timbrar_nomina(nomina_id: int, current_user: dict[str, Any]) -> dict[str, Any]:
+    """Timbra los recibos de sueldo de una nómina CERRADA vía Facturama."""
+    fac = _get_facturama()
+
+    with get_connection() as conn:
+        nom = conn.execute(
+            text("SELECT Company_Id, Estatus, PeriodoInicio, PeriodoFin FROM ERP_NOI_NOMINAS WHERE Nomina_Id=:id"),
+            {"id": nomina_id},
+        ).mappings().first()
+    if not nom:
+        raise HTTPException(status_code=404, detail="Nómina no encontrada")
+    _check_company(current_user, int(nom["Company_Id"]))
+    if nom["Estatus"] != "CERRADA":
+        raise HTTPException(status_code=400, detail="Solo se pueden timbrar nóminas cerradas")
+
+    company_id = int(nom["Company_Id"])
+    emisor = fac.get_emisor_data(company_id)
+
+    with get_connection() as conn:
+        lineas = conn.execute(
+            text("""
+                SELECT l.NominaLinea_Id, l.Empleado_Id, l.Percepciones, l.Deducciones, l.Neto,
+                       l.EstadoTimbrado,
+                       e.Nombre, e.RFC, e.CURP, e.NSS, e.SalarioBase, e.SalarioDiarioIntegrado,
+                       e.Puesto, e.Departamento, e.TipoContrato, e.TipoJornada, e.FechaIngreso
+                FROM ERP_NOI_NOMINA_LINEAS l
+                JOIN ERP_NOI_EMPLEADOS e ON e.Empleado_Id = l.Empleado_Id
+                WHERE l.Nomina_Id = :id
+                  AND (l.EstadoTimbrado IS NULL OR l.EstadoTimbrado = 'ERROR')
+            """),
+            {"id": nomina_id},
+        ).mappings().all()
+
+        detalle_por_linea: dict[int, list] = {}
+        if lineas:
+            all_linea_ids = [int(l["NominaLinea_Id"]) for l in lineas]
+            placeholders = ", ".join(f":lid{i}" for i, _ in enumerate(all_linea_ids))
+            det_params = {f"lid{i}": lid for i, lid in enumerate(all_linea_ids)}
+            det_rows = conn.execute(
+                text(f"""
+                    SELECT d.NominaLinea_Id, d.Importe, d.Gravado, d.Exento,
+                           c.Clave, c.Descripcion
+                    FROM ERP_NOI_NOMINA_DETALLE d
+                    LEFT JOIN ERP_NOI_CONCEPTOS c ON c.Concepto_Id = d.Concepto_Id
+                    WHERE d.NominaLinea_Id IN ({placeholders})
+                """),
+                det_params,
+            ).mappings().all()
+            for row in det_rows:
+                lid = int(row["NominaLinea_Id"])
+                detalle_por_linea.setdefault(lid, []).append(dict(row))
+
+    timbrados = 0
+    errores = 0
+    detalles: list[dict] = []
+
+    for linea in lineas:
+        linea_id = int(linea["NominaLinea_Id"])
+        empleado = dict(linea)
+        detalle = detalle_por_linea.get(linea_id, [])
+        linea_data = {
+            **dict(linea),
+            "PeriodoInicio": str(nom["PeriodoInicio"])[:10],
+            "PeriodoFin": str(nom["PeriodoFin"])[:10],
+            "DiasLaborados": 15,
+        }
+
+        try:
+            result = fac.timbrar_recibo_nomina(emisor, empleado, linea_data, detalle, company_id)
+            uuid = result.get("Uuid") or result.get("UUID") or result.get("uuid") or ""
+            facturama_id = result.get("Id") or result.get("id") or ""
+            xml_content = result.get("XmlContent") or result.get("xml") or ""
+
+            with get_transaction() as conn:
+                conn.execute(
+                    text("""
+                        UPDATE ERP_NOI_NOMINA_LINEAS SET
+                            UUID=:uuid, FacturamaId=:fid,
+                            XmlTimbrado=:xml, FechaTimbrado=GETDATE(),
+                            EstadoTimbrado='TIMBRADO', ErrorTimbrado=NULL
+                        WHERE NominaLinea_Id=:id
+                    """),
+                    {"uuid": uuid, "fid": str(facturama_id), "xml": xml_content, "id": linea_id},
+                )
+            timbrados += 1
+            detalles.append({"linea_id": linea_id, "empleado": linea["Nombre"], "status": "TIMBRADO", "uuid": uuid})
+
+        except Exception as exc:
+            msg = str(exc)
+            with get_transaction() as conn:
+                conn.execute(
+                    text("UPDATE ERP_NOI_NOMINA_LINEAS SET EstadoTimbrado='ERROR', ErrorTimbrado=:err WHERE NominaLinea_Id=:id"),
+                    {"err": msg[:500], "id": linea_id},
+                )
+            errores += 1
+            detalles.append({"linea_id": linea_id, "empleado": linea["Nombre"], "status": "ERROR", "error": msg[:200]})
+
+    return {
+        "success": True,
+        "message": f"Timbrado: {timbrados} recibos, {errores} errores",
+        "data": {"timbrados": timbrados, "errores": errores, "detalles": detalles},
+    }
+
+
+def get_xml_linea(linea_id: int, current_user: dict[str, Any]) -> dict[str, Any]:
+    """Retorna el XML timbrado almacenado en BD para una línea de nómina."""
+    with get_connection() as conn:
+        row = conn.execute(
+            text("""
+                SELECT l.XmlTimbrado, l.UUID, l.EstadoTimbrado, n.Company_Id, e.Nombre, e.RFC
+                FROM ERP_NOI_NOMINA_LINEAS l
+                JOIN ERP_NOI_NOMINAS n ON n.Nomina_Id = l.Nomina_Id
+                JOIN ERP_NOI_EMPLEADOS e ON e.Empleado_Id = l.Empleado_Id
+                WHERE l.NominaLinea_Id = :id
+            """),
+            {"id": linea_id},
+        ).mappings().first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Línea no encontrada")
+    _check_company(current_user, int(row["Company_Id"]))
+    if not row["XmlTimbrado"]:
+        raise HTTPException(status_code=404, detail="Esta línea no tiene XML timbrado")
+    return {
+        "success": True,
+        "data": {
+            "xml": row["XmlTimbrado"],
+            "uuid": row["UUID"],
+            "empleado": row["Nombre"],
+            "rfc": row["RFC"],
+        },
+    }
 
 
 def update_linea(linea_id: int, payload: dict[str, Any], current_user: dict[str, Any]) -> dict[str, Any]:

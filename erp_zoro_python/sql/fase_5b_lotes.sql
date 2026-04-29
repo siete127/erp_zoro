@@ -1,0 +1,38 @@
+-- Fase 5B: Trazabilidad de lotes y series
+-- Idempotente: seguro de ejecutar múltiples veces
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'ERP_LOTES')
+CREATE TABLE ERP_LOTES (
+    Lote_Id          INT IDENTITY(1,1) PRIMARY KEY,
+    Company_Id       INT NOT NULL,
+    Producto_Id      INT NOT NULL,
+    NumeroLote       NVARCHAR(100) NOT NULL,
+    NumeroSerie      NVARCHAR(100) NULL,
+    Almacen_Id       INT NULL,
+    FechaRecepcion   DATE NOT NULL DEFAULT CAST(GETDATE() AS DATE),
+    FechaVencimiento DATE NULL,
+    CantidadInicial  DECIMAL(18,4) NOT NULL DEFAULT 0,
+    CantidadActual   DECIMAL(18,4) NOT NULL DEFAULT 0,
+    Proveedor_Id     INT NULL,
+    Notas            NVARCHAR(500) NULL,
+    Activo           BIT NOT NULL DEFAULT 1,
+    CreatedAt        DATETIME DEFAULT GETDATE()
+);
+
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'ERP_KARDEX' AND COLUMN_NAME = 'Lote_Id'
+)
+    ALTER TABLE ERP_KARDEX ADD Lote_Id INT NULL;
+
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'ERP_PRODUCTOS' AND COLUMN_NAME = 'ControlLote'
+)
+    ALTER TABLE ERP_PRODUCTOS ADD ControlLote BIT NOT NULL DEFAULT 0;
+
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'ERP_PRODUCTOS' AND COLUMN_NAME = 'ControlSerie'
+)
+    ALTER TABLE ERP_PRODUCTOS ADD ControlSerie BIT NOT NULL DEFAULT 0;

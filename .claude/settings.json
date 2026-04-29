@@ -59,7 +59,14 @@
       "Bash(mv setup_payroll_leave_mapping.py scripts/)",
       "Bash(python -m pytest app/tests/ --collect-only)",
       "Bash(python -m pytest app/tests/ -v)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(grep -rn 'pass$\\\\|raise NotImplementedError\\\\|return {}\\\\|return \\\\[\\\\]\\\\|# TODO\\\\|# FIXME' /c/Users/diazj/OneDrive/Escritorio/ERP_PROYECTO/erp_zoro_python/app/services '--include=*.py')",
+      "Bash(grep -o '`[^`]*`\\\\|\"[^\"]*\"\\\\|'\"'\"'[^'\"'\"']*'\"'\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(grep -E \"\\\\.py$\")",
+      "Bash(awk '{print $5, $NF}')",
+      "Bash(sort -k1 -h)"
     ],
     "additionalDirectories": [
       "c:\\Users\\diazj\\.claude\\projects\\c--Users-diazj-OneDrive-Escritorio-ERP-PROYECTO\\memory",

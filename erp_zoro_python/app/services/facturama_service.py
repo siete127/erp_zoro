@@ -574,6 +574,156 @@ def _is_transient_status(status_code: int | None) -> bool:
     return status_code == 429 or bool(status_code and 500 <= status_code < 600)
 
 
+def timbrar_recibo_nomina(
+    emisor: dict[str, Any],
+    empleado: dict[str, Any],
+    linea: dict[str, Any],
+    detalle: list[dict[str, Any]],
+    company_id: int,
+) -> dict[str, Any]:
+    """
+    Construye payload CFDI 4.0 con complemento Nómina12 y timbra vía Facturama.
+
+    emisor   — resultado de get_emisor_data()
+    empleado — fila ERP_NOI_EMPLEADOS (Nombre, RFC, CURP, NSS, SDI, ...)
+    linea    — fila ERP_NOI_NOMINA_LINEAS (Percepciones, Deducciones, Neto, ...)
+    detalle  — lista de filas ERP_NOI_NOMINA_DETALLE con desglose ISR/IMSS/Sueldo
+    """
+    from datetime import datetime
+
+    fecha_pago = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
+
+    percepciones_gravadas = sum(
+        float(d.get("Gravado") or 0)
+        for d in detalle
+        if float(d.get("Importe") or 0) > 0
+    )
+    percepciones_exentas = sum(
+        float(d.get("Exento") or 0)
+        for d in detalle
+        if float(d.get("Importe") or 0) > 0
+    )
+    total_percepciones = round(percepciones_gravadas + percepciones_exentas, 2)
+
+    deducciones_list = [d for d in detalle if float(d.get("Importe") or 0) < 0]
+    total_deducciones = round(sum(abs(float(d.get("Importe") or 0)) for d in deducciones_list), 2)
+
+    neto = round(float(linea.get("Neto") or 0), 2)
+    sdi = round(float(empleado.get("SalarioDiarioIntegrado") or empleado.get("SalarioBase", 0) / 30), 2)
+
+    percepciones_detalle = []
+    for d in detalle:
+        importe = float(d.get("Importe") or 0)
+        if importe <= 0:
+            continue
+        clave = str(d.get("Clave") or "001")
+        concepto = str(d.get("Descripcion") or "Sueldo")
+        percepciones_detalle.append({
+            "TipoPercepcion": "001",
+            "Clave": clave,
+            "Concepto": concepto,
+            "ImporteGravado": round(float(d.get("Gravado") or importe), 2),
+            "ImporteExento": round(float(d.get("Exento") or 0), 2),
+        })
+
+    deducciones_detalle = []
+    for d in deducciones_list:
+        clave = str(d.get("Clave") or "002")
+        concepto = str(d.get("Descripcion") or "Deducción")
+        tipo = "002" if "ISR" in concepto.upper() else "001"
+        deducciones_detalle.append({
+            "TipoDeduccion": tipo,
+            "Clave": clave,
+            "Concepto": concepto,
+            "Importe": round(abs(float(d.get("Importe") or 0)), 2),
+        })
+
+    complemento_nomina = {
+        "TipoNomina": "O",
+        "FechaPago": fecha_pago[:10],
+        "FechaInicialPago": str(linea.get("PeriodoInicio") or fecha_pago[:10]),
+        "FechaFinalPago": str(linea.get("PeriodoFin") or fecha_pago[:10]),
+        "NumDiasPagados": float(linea.get("DiasLaborados") or 15),
+        "TotalPercepciones": total_percepciones,
+        "TotalDeducciones": total_deducciones,
+        "Emisor": {
+            "RegistroPatronal": _clean_value(emisor.get("RegistroPatronal")) or "A0000000000",
+        },
+        "Receptor": {
+            "Curp": _clean_value(empleado.get("CURP")) or "XEXX010101HNEXXXA4",
+            "NumSeguridadSocial": _clean_value(empleado.get("NSS")) or "",
+            "FechaInicioRelLaboral": str(empleado.get("FechaIngreso") or "2020-01-01")[:10],
+            "TipoContrato": _clean_value(empleado.get("TipoContrato")) or "01",
+            "Sindicalizado": "No",
+            "TipoJornada": _clean_value(empleado.get("TipoJornada")) or "01",
+            "TipoRegimen": "02",
+            "NumEmpleado": str(empleado.get("Empleado_Id") or "1"),
+            "Departamento": _clean_value(empleado.get("Departamento")) or "",
+            "Puesto": _clean_value(empleado.get("Puesto")) or "Empleado",
+            "SalarioBaseCotApor": sdi,
+            "SalarioDiarioIntegrado": sdi,
+            "ClaveEntFed": "CMX",
+        },
+        "Percepciones": {
+            "TotalGravado": percepciones_gravadas,
+            "TotalExento": percepciones_exentas,
+            "Percepcion": percepciones_detalle,
+        },
+        "Deducciones": {
+            "TotalOtrasDeducciones": total_deducciones,
+            "TotalImpuestosRetenidos": sum(
+                abs(float(d.get("Importe") or 0))
+                for d in deducciones_list
+                if "ISR" in str(d.get("Descripcion") or "").upper()
+            ),
+            "Deduccion": deducciones_detalle,
+        },
+    }
+
+    rfc_receptor = _clean_value(empleado.get("RFC")) or "XAXX010101000"
+    nombre_receptor = _clean_value(empleado.get("Nombre")) or "EMPLEADO"
+
+    payload = {
+        "Issuer": {
+            "Rfc": _clean_value(emisor.get("Rfc")),
+            "Name": _clean_value(emisor.get("Name")),
+            "FiscalRegime": normalize_fiscal_regime(emisor.get("FiscalRegime")) or "601",
+        },
+        "CfdiType": "N",
+        "NameId": "8",
+        "ExpeditionPlace": _clean_value(emisor.get("TaxZipCode")) or "06600",
+        "PaymentMethod": "PUE",
+        "PaymentForm": "99",
+        "Currency": "MXN",
+        "Receiver": {
+            "Rfc": rfc_receptor,
+            "Name": nombre_receptor,
+            "FiscalRegime": "605",
+            "TaxZipCode": _clean_value(empleado.get("CodigoPostal")) or "06600",
+            "CfdiUse": "CN01",
+        },
+        "Items": [
+            {
+                "ProductCode": "84111505",
+                "UnitCode": "ACT",
+                "Unit": "Actividad",
+                "Description": "Pago de nómina",
+                "Quantity": 1,
+                "UnitPrice": neto,
+                "Subtotal": neto,
+                "TaxObject": "01",
+                "Total": neto,
+                "Taxes": [],
+            }
+        ],
+        "Complemento": {
+            "Nomina12": complemento_nomina,
+        },
+    }
+
+    return timbrar_for_company(payload, company_id)
+
+
 def cancelar_cfdi(
     facturama_id: str,
     motivo: str = "02",

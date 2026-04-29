@@ -6,6 +6,8 @@ const verifyToken = require("../middleware/authMiddleware");
 // ── Inventario consolidado (totales + estados operativos) ──────────────
 router.get("/consolidado", verifyToken, inventarioController.listConsolidado);
 router.put("/consolidado", verifyToken, inventarioController.updateEstadoConsolidado);
+router.get("/planeacion/resumen", verifyToken, inventarioController.getPlaneacionResumen);
+router.get("/planeacion/reabastecimiento", verifyToken, inventarioController.listReabastecimiento);
 
 // ── Inventario de Materia Prima ─────────────────────────────────────────
 router.get("/mp", verifyToken, inventarioController.listStockMP);

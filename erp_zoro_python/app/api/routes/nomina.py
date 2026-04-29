@@ -135,6 +135,21 @@ def cerrar_nomina(nomina_id: int, current_user: dict = Depends(get_current_user)
     return nomina_service.cerrar_nomina(nomina_id, current_user)
 
 
+@router.post("/nominas/{nomina_id}/calcular")
+def calcular_nomina(nomina_id: int, current_user: dict = Depends(get_current_user)) -> dict:
+    return nomina_service.calcular_nomina(nomina_id, current_user)
+
+
+@router.post("/nominas/{nomina_id}/timbrar")
+def timbrar_nomina(nomina_id: int, current_user: dict = Depends(get_current_user)) -> dict:
+    return nomina_service.timbrar_nomina(nomina_id, current_user)
+
+
+@router.get("/nominas/{nomina_id}/lineas/{linea_id}/xml")
+def descargar_xml_linea(nomina_id: int, linea_id: int, current_user: dict = Depends(get_current_user)) -> dict:
+    return nomina_service.get_xml_linea(linea_id, current_user)
+
+
 @router.put("/lineas/{linea_id}")
 def update_linea(linea_id: int, payload: LineaUpdate, current_user: dict = Depends(get_current_user)) -> dict:
     return nomina_service.update_linea(linea_id, payload.model_dump(), current_user)

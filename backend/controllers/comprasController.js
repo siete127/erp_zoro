@@ -12,6 +12,7 @@ const pdfParse = require('pdf-parse');
 const XLSX = require('xlsx');
 const { pool, sql } = require('../config/db');
 const pdfService = require('../services/comprasPdfService');
+const { updateAverageCostFromReceipt } = require('../services/inventoryValuationService');
 
 const DEFAULT_IVA_RATE = 16.0;
 const PROVEEDOR_NOMBRE_SQL = "COALESCE(NULLIF(cl.CommercialName, ''), cl.LegalName)";
@@ -1208,6 +1209,16 @@ exports.recibirMercancia = async (req, res) => {
 
       } else if (det.Producto_Id) {
         // ── PRODUCTO TERMINADO: upsert en ERP_STOCK ──
+        const stockPrevioResult = await pool.request()
+          .input('Producto_Id', sql.Int, det.Producto_Id)
+          .input('Almacen_Id', sql.Int, almacenId)
+          .query(`
+            SELECT TOP 1 Cantidad
+            FROM ERP_STOCK
+            WHERE Producto_Id = @Producto_Id AND Almacen_Id = @Almacen_Id
+          `);
+        const stockPrevio = Number(stockPrevioResult.recordset?.[0]?.Cantidad || 0);
+
         await pool.request()
           .input('Producto_Id', sql.Int,           det.Producto_Id)
           .input('Almacen_Id',  sql.Int,           almacenId)
@@ -1234,6 +1245,12 @@ exports.recibirMercancia = async (req, res) => {
               SET CostoInicial = @PrecioCompra, FechaActualizacion = GETDATE()
             WHERE Producto_Id = @Producto_Id
           `);
+        await updateAverageCostFromReceipt({
+          productoId: det.Producto_Id,
+          cantidadEntrante: cantRec,
+          costoUnitario: Number(det.PrecioCompra),
+          stockPrevio,
+        });
       }
     }
 

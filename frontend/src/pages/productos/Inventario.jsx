@@ -73,6 +73,7 @@ function StatCard({ label, value, icon, color, alert, loading }) {
 const TABS = [
   { id: 'stock',       label: 'Stock por Almacen',  icon: 'ALM' },
   { id: 'consolidado', label: 'Estado consolidado', icon: 'CON' },
+  { id: 'planeacion',  label: 'Planeacion',         icon: 'PLN' },
   { id: 'mp',          label: 'Materia prima',      icon: 'MP' },
 ];
 
@@ -93,6 +94,10 @@ export default function Inventario() {
   const [filtrosCons, setFiltrosCons] = useState({ search: '', company_id: 'all', clasificacion: 'all' });
   const [editRow, setEditRow] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [planeacionResumen, setPlaneacionResumen] = useState(null);
+  const [loadingPlaneacion, setLoadingPlaneacion] = useState(false);
+  const [reabastecimiento, setReabastecimiento] = useState([]);
+  const [planeacionFilters, setPlaneacionFilters] = useState({ search: '', company_id: 'all' });
 
   // ── Shared ────────────────────────────────────────────────────────────────
   // ── Materia Prima ─────────────────────────────────────────────────────────
@@ -171,6 +176,27 @@ export default function Inventario() {
     }
   }, [filtrosMP]);
 
+  const fetchPlaneacion = useCallback(async () => {
+    setLoadingPlaneacion(true);
+    try {
+      const params = new URLSearchParams();
+      if (planeacionFilters.search) params.append('search', planeacionFilters.search);
+      if (planeacionFilters.company_id !== 'all') params.append('company_id', planeacionFilters.company_id);
+
+      const [summaryRes, restockRes] = await Promise.all([
+        api.get(`/inventario/planeacion/resumen?${params}`),
+        api.get(`/inventario/planeacion/reabastecimiento?${params}`),
+      ]);
+
+      setPlaneacionResumen(summaryRes.data?.data || null);
+      setReabastecimiento(restockRes.data?.data || []);
+    } catch (err) {
+      notify(err.response?.data?.msg || 'Error cargando planeacion de inventario', 'error');
+    } finally {
+      setLoadingPlaneacion(false);
+    }
+  }, [planeacionFilters]);
+
   const fetchMachineEntries = useCallback(async () => {
     setLoadingMachineEntries(true);
     try {
@@ -190,9 +216,10 @@ export default function Inventario() {
   useEffect(() => {
     if (tab === 'stock') fetchStock();
     if (tab === 'consolidado') fetchConsolidado();
+    if (tab === 'planeacion') fetchPlaneacion();
     if (tab === 'mp') fetchStockMP();
     if (tab === 'mp') fetchMachineEntries();
-  }, [tab, fetchStock, fetchConsolidado, fetchStockMP, fetchMachineEntries]);
+  }, [tab, fetchStock, fetchConsolidado, fetchPlaneacion, fetchStockMP, fetchMachineEntries]);
 
   useEffect(() => {
     const fetchCompanies = async () => {
@@ -212,6 +239,7 @@ export default function Inventario() {
     const handler = () => {
       if (tab === 'stock') fetchStock();
       if (tab === 'consolidado') fetchConsolidado();
+      if (tab === 'planeacion') fetchPlaneacion();
     };
     socket.on('inventario:changed', handler);
     socket.on('inventario:recepcion-produccion', handler);
@@ -219,7 +247,7 @@ export default function Inventario() {
       socket.off('inventario:changed', handler);
       socket.off('inventario:recepcion-produccion', handler);
     };
-  }, [tab, fetchStock, fetchConsolidado]);
+  }, [tab, fetchStock, fetchConsolidado, fetchPlaneacion]);
 
   // ── Guardar cantidades operacionales ─────────────────────────────────────
   const handleSaveEdit = async () => {
@@ -642,6 +670,90 @@ export default function Inventario() {
           )}
 
           {/* ══════════ TAB: Materia Prima ══════════ */}
+          {tab === 'planeacion' && (
+            <>
+              <div className="flex flex-wrap items-center gap-2 mb-5 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                {isAdmin && (
+                  <select
+                    value={planeacionFilters.company_id}
+                    onChange={(e) => setPlaneacionFilters({ ...planeacionFilters, company_id: e.target.value })}
+                    className="h-9 px-3 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#092052]/30"
+                  >
+                    <option value="all">Todas las empresas</option>
+                    {companies.map(c => <option key={c.Company_Id} value={c.Company_Id}>{c.NameCompany}</option>)}
+                  </select>
+                )}
+                <input
+                  value={planeacionFilters.search}
+                  onChange={(e) => setPlaneacionFilters({ ...planeacionFilters, search: e.target.value })}
+                  placeholder="Buscar SKU o producto..."
+                  className="h-9 flex-1 min-w-[180px] px-3 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#092052]/30"
+                />
+                <button
+                  onClick={fetchPlaneacion}
+                  className="h-9 px-4 bg-[#092052] hover:bg-[#0d3a7a] text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  Actualizar
+                </button>
+              </div>
+
+              <div className="grid gap-3 mb-5 md:grid-cols-2 xl:grid-cols-4">
+                {[
+                  { label: 'Productos evaluados', value: planeacionResumen?.ProductosEvaluados || 0, tone: 'text-slate-900', bg: 'bg-slate-50 border-slate-200' },
+                  { label: 'Bajo minimo', value: planeacionResumen?.ProductosBajoMinimo || 0, tone: 'text-rose-700', bg: 'bg-rose-50 border-rose-200' },
+                  { label: 'Valor inventario', value: `$${Number(planeacionResumen?.ValorInventario || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`, tone: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
+                  { label: 'Costo sugerido', value: `$${Number(planeacionResumen?.CostoReabastecimientoSugerido || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`, tone: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
+                ].map((card) => (
+                  <div key={card.label} className={`rounded-2xl border px-4 py-4 ${card.bg}`}>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{card.label}</p>
+                    <p className={`mt-2 text-2xl font-bold ${card.tone}`}>{loadingPlaneacion ? '...' : card.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="overflow-auto rounded-xl border border-gray-200">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="py-3 pl-4 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">SKU</th>
+                      <th className="py-3 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Producto</th>
+                      <th className="py-3 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Empresa</th>
+                      <th className="py-3 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Stock actual</th>
+                      <th className="py-3 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Stock minimo</th>
+                      <th className="py-3 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Costo promedio</th>
+                      <th className="py-3 pr-3 text-xs font-semibold text-amber-700 uppercase tracking-wide text-right">Sugerido</th>
+                      <th className="py-3 pr-3 text-xs font-semibold text-amber-700 uppercase tracking-wide text-right">Costo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingPlaneacion
+                      ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={8} />)
+                      : reabastecimiento.length === 0
+                        ? (
+                          <tr>
+                            <td colSpan={8} className="py-10 text-center text-sm text-gray-400">
+                              No hay sugerencias de reabastecimiento para los filtros actuales.
+                            </td>
+                          </tr>
+                        )
+                        : reabastecimiento.map((row) => (
+                          <tr key={`${row.Company_Id}-${row.Producto_Id}`} className="border-t border-gray-100 hover:bg-amber-50/30">
+                            <td className="py-3 pl-4 pr-3 font-mono text-xs text-gray-700">{row.SKU}</td>
+                            <td className="py-3 pr-3 font-medium text-gray-900">{row.Nombre}</td>
+                            <td className="py-3 pr-3 text-xs text-gray-500">{row.NameCompany}</td>
+                            <td className="py-3 pr-3 text-right">{Number(row.StockActual || 0).toLocaleString('es-MX')}</td>
+                            <td className="py-3 pr-3 text-right">{Number(row.StockMinimo || 0).toLocaleString('es-MX')}</td>
+                            <td className="py-3 pr-3 text-right text-gray-600">${Number(row.CostoPromedio || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+                            <td className="py-3 pr-3 text-right font-bold text-amber-700">{Number(row.CantidadSugerida || 0).toLocaleString('es-MX')}</td>
+                            <td className="py-3 pr-3 text-right font-semibold text-amber-800">${Number(row.CostoReabastecimiento || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+                          </tr>
+                        ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
           {tab === 'mp' && (
             <>
               {/* Filtros */}
