@@ -320,6 +320,54 @@ def notify_company_users(
     return created
 
 
+def notify_admins_in_company(
+    company_id: int,
+    *,
+    tipo: str = "vacaciones",
+    titulo: str,
+    cuerpo: str,
+    link: str | None = None,
+    exclude_user_ids: set[int] | None = None,
+    dedupe_hours: int | None = 1,
+) -> int:
+    """Notifica solo a usuarios admin/superadmin activos de la empresa."""
+    company_id = int(company_id or 0)
+    if not company_id:
+        return 0
+
+    excluded = {int(uid) for uid in (exclude_user_ids or set()) if int(uid or 0)}
+    try:
+        with get_connection() as connection:
+            rows = connection.execute(
+                text(
+                    """
+                    SELECT DISTINCT uc.User_Id
+                    FROM ERP_USERCOMPANIES uc
+                    INNER JOIN ERP_USERS u ON u.User_Id = uc.User_Id
+                    INNER JOIN ERP_ROL r ON r.Rol_Id = u.RolId
+                    WHERE uc.Company_Id = :company_id
+                      AND ISNULL(u.IsActive, 0) = 1
+                      AND u.RolId IN (1, 2)
+                    ORDER BY uc.User_Id
+                    """
+                ),
+                {"company_id": company_id},
+            ).fetchall()
+    except Exception:
+        return 0
+
+    created = 0
+    for (raw_user_id,) in rows:
+        target_user_id = int(raw_user_id or 0)
+        if not target_user_id or target_user_id in excluded:
+            continue
+        if create_notification(
+            target_user_id, tipo, titulo, cuerpo, link, dedupe_hours=dedupe_hours
+        ):
+            created += 1
+    return created
+
+
 def sync_factura_vencimiento_notifications(
     data: dict[str, Any],
     current_user: dict[str, Any],

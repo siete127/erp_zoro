@@ -10,9 +10,24 @@ from fastapi import HTTPException, status
 from sqlalchemy import text
 
 from app.db.session import get_connection, get_transaction
+from app.services import notificacion_service
 
 
-# ── Helpers internos ──────────────────────────────────────────────────────────
+# ── Helpers internos ─────────────────────────────────────────────────────────
+
+def _get_user_name(user_id: int) -> str:
+    try:
+        with get_connection() as conn:
+            row = conn.execute(
+                text("SELECT TRIM(ISNULL(Name,'') + ' ' + ISNULL(Lastname,'')) FROM ERP_USER WHERE User_Id=:u"),
+                {"u": user_id},
+            ).fetchone()
+        return row[0].strip() if row and row[0] else f"Usuario #{user_id}"
+    except Exception:
+        return f"Usuario #{user_id}"
+
+
+
 
 def _check_user_in_company(user_id: int, company_id: int) -> None:
     """Lanza 403 si el user_id no pertenece a la empresa."""
@@ -333,6 +348,18 @@ async def create_leave_request(
     # Actualizar PlannedDays en el saldo
     _update_planned_days(user_id, leave_type_id, int(year), days)
 
+    # Notificar a los administradores de la empresa
+    try:
+        nombre = _get_user_name(user_id)
+        notificacion_service.notify_admins_in_company(
+            company_id=company_id,
+            titulo="Nueva solicitud de vacaciones",
+            cuerpo=f"{nombre} solicitó {days} día(s) ({start_date} → {end_date})",
+            link="/rh",
+        )
+    except Exception:
+        pass
+
     # Devolver la solicitud recién creada
     with get_connection() as conn:
         row = conn.execute(
@@ -456,6 +483,28 @@ async def approve_leave_request(
                 )
         elif estatus == "Rechazado":
             _update_planned_days(user_id, lt_id, year, -float(cantidad or 0))
+
+    # Notificar al empleado
+    try:
+        if estatus == "Aprobado":
+            notificacion_service.create_notification(
+                user_id,
+                tipo="vacaciones",
+                titulo="Vacaciones aprobadas",
+                cuerpo=f"Tu solicitud de {cantidad} día(s) fue aprobada.",
+                link="/rh",
+            )
+        else:
+            obs_txt = f" Motivo: {observaciones}" if observaciones else ""
+            notificacion_service.create_notification(
+                user_id,
+                tipo="vacaciones",
+                titulo="Vacaciones rechazadas",
+                cuerpo=f"Tu solicitud de {cantidad} día(s) fue rechazada.{obs_txt}",
+                link="/rh",
+            )
+    except Exception:
+        pass
 
     return {"msg": f"Solicitud {estatus.lower()}", "vacaciones_id": vacaciones_id}
 
