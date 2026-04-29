@@ -48,16 +48,15 @@ def create_leave_mapping(
     Returns:
         dict: Información del mapeo creado
     """
-    # Verificar permisos
-    is_admin = current_user.get("isAdmin", False)
-    is_super = current_user.get("isSuperAdmin", False)
-    
+    is_admin = current_user.get("is_admin", False)
+    is_super = current_user.get("is_super_admin", False)
+
     if not is_admin and not is_super:
         raise HTTPException(
             status_code=403,
             detail="No tiene permisos para crear mapeos de nómina"
         )
-    
+
     return svc.create_payroll_mapping(vacaciones_id, current_user.get("User_Id"))
 
 
@@ -77,8 +76,8 @@ def sync_leave_to_payroll(
     Returns:
         dict: Resultado de la sincronización
     """
-    is_admin = current_user.get("isAdmin", False)
-    is_super = current_user.get("isSuperAdmin", False)
+    is_admin = current_user.get("is_admin", False)
+    is_super = current_user.get("is_super_admin", False)
     
     if not is_admin and not is_super:
         raise HTTPException(
@@ -105,8 +104,8 @@ def get_pending_mappings(
     Returns:
         list: Mapeos pendientes
     """
-    is_admin = current_user.get("isAdmin", False)
-    is_super = current_user.get("isSuperAdmin", False)
+    is_admin = current_user.get("is_admin", False)
+    is_super = current_user.get("is_super_admin", False)
     
     if not is_admin and not is_super:
         raise HTTPException(
@@ -158,8 +157,8 @@ def cancel_vacation_mapping(
     Returns:
         dict: Resultado de la cancelación
     """
-    is_admin = current_user.get("isAdmin", False)
-    is_super = current_user.get("isSuperAdmin", False)
+    is_admin = current_user.get("is_admin", False)
+    is_super = current_user.get("is_super_admin", False)
     
     if not is_admin and not is_super:
         raise HTTPException(
@@ -240,9 +239,9 @@ def get_employee_salary(
     from app.db.session import get_connection
     
     # Verificar que no sea información privada (solo admin, super, o del mismo usuario)
-    current_user_id = current_user.get("User_Id")
-    is_admin = current_user.get("isAdmin", False)
-    is_super = current_user.get("isSuperAdmin", False)
+    current_user_id = current_user.get("User_Id") or current_user.get("user_id")
+    is_admin = current_user.get("is_admin", False)
+    is_super = current_user.get("is_super_admin", False)
     
     if user_id != current_user_id and not is_admin and not is_super:
         raise HTTPException(
@@ -305,8 +304,8 @@ def auto_sync_to_payroll(
     Sincroniza automáticamente todos los mapeos pendientes a la nómina abierta más reciente.
     No requiere seleccionar nómina_linea_id manualmente.
     """
-    is_admin = current_user.get("isAdmin", False)
-    is_super = current_user.get("isSuperAdmin", False)
+    is_admin = current_user.get("is_admin", False)
+    is_super = current_user.get("is_super_admin", False)
     if not is_admin and not is_super:
         raise HTTPException(status_code=403, detail="No tiene permisos para auto-sincronizar")
     return svc.auto_sync_pending_to_open_payroll()
@@ -318,8 +317,8 @@ def get_all_mappings(
     current_user: dict = Depends(get_current_user),
 ):
     """Obtiene historial completo de mapeos (todos los estados)."""
-    is_admin = current_user.get("isAdmin", False)
-    is_super = current_user.get("isSuperAdmin", False)
+    is_admin = current_user.get("is_admin", False)
+    is_super = current_user.get("is_super_admin", False)
     if not is_admin and not is_super:
         raise HTTPException(status_code=403, detail="No tiene permisos")
     return svc.get_all_leave_mappings(limit)
@@ -337,8 +336,8 @@ def get_mapping_statistics(
     Returns:
         dict: Estadísticas de mapeos
     """
-    is_admin = current_user.get("isAdmin", False)
-    is_super = current_user.get("isSuperAdmin", False)
+    is_admin = current_user.get("is_admin", False)
+    is_super = current_user.get("is_super_admin", False)
     
     if not is_admin and not is_super:
         raise HTTPException(

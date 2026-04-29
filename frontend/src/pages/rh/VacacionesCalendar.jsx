@@ -88,26 +88,38 @@ export default function VacacionesCalendar({ currentUser, onCreateClick }) {
     setLoading(true);
     try {
       const year = currentDate.getFullYear();
-      const month = currentDate.getMonth() + 1;
-      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-      const endDate = `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`;
-      const data = await leaveService.getApprovedVacations(
-        currentUser?.company_id,
-        startDate,
-        endDate
-      );
-
+      // Intentar nuevo endpoint primero
+      const data = await leaveService.listRequests({ estatus: 'Aprobado', year });
       if (Array.isArray(data) && data.length > 0) {
-        setVacaciones(data);
+        // Normalizar campos: soportar tanto nuevo (start_date) como legacy (FechaInicio)
+        const normalized = data.map(v => ({
+          ...v,
+          FechaInicio: v.FechaInicio || v.start_date,
+          FechaFin: v.FechaFin || v.end_date,
+          Cantidad: v.Cantidad || v.days_count || 0,
+          Nombre: v.Nombre || v.NombreEmpleado || v.user_name || 'Colaborador',
+          Razon: v.Razon || v.razon || '',
+          Vacaciones_Id: v.Vacaciones_Id || v.id,
+        }));
+        setVacaciones(normalized);
         setUseMockData(false);
       } else {
+        setVacaciones([]);
+        setUseMockData(false);
+      }
+    } catch {
+      try {
+        // Fallback al endpoint legacy
+        const month = currentDate.getMonth() + 1;
+        const startDate = `${currentDate.getFullYear()}-${String(month).padStart(2, '0')}-01`;
+        const endDate = `${currentDate.getFullYear()}-${String(month).padStart(2, '0')}-${new Date(currentDate.getFullYear(), month, 0).getDate()}`;
+        const data = await leaveService.getApprovedVacations(currentUser?.company_id, startDate, endDate);
+        setVacaciones(Array.isArray(data) ? data : []);
+        setUseMockData(false);
+      } catch {
         setVacaciones(leaveService.getMockApprovedVacations());
         setUseMockData(true);
       }
-    } catch (error) {
-      console.warn('Usando datos mock de vacaciones debido a:', error.message);
-      setVacaciones(leaveService.getMockApprovedVacations());
-      setUseMockData(true);
     } finally {
       setLoading(false);
     }

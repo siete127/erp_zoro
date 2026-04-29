@@ -40,7 +40,7 @@ export default function VacacionesReports({ currentUser }) {
   const [pendingList, setPendingList] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const isAdmin = currentUser?.isAdmin || currentUser?.is_admin || currentUser?.RolId === 2;
+  const isAdmin = currentUser?.is_admin || currentUser?.isAdmin || currentUser?.RolId <= 2;
 
   const loadAll = useCallback(async () => {
     setLoading(true);

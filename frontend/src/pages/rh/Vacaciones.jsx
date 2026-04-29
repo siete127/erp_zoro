@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { vacacionesService } from '../../services/vacacionesService';
+import React, { useEffect, useState, useCallback } from 'react';
+import leaveService from '../../services/leaveService';
 import { notify } from '../../services/notify';
 import confirm from '../../services/confirm';
-import api from '../../services/api';
 import VacacionesCalendar from './VacacionesCalendar';
 import BalanceWidget from './BalanceWidget';
 import LeaveTypeSelector from './LeaveTypeSelector';
@@ -10,369 +9,297 @@ import PayrollSyncPanel from './PayrollSyncPanel';
 import VacacionesReports from './VacacionesReports';
 import './vacaciones.css';
 
+const TODAY = new Date().toISOString().split('T')[0];
+const CURRENT_YEAR = new Date().getFullYear();
+
+const EMPTY_FORM = {
+  start_date: '',
+  end_date: '',
+  razon: '',
+  leave_type_id: null,
+};
+
+const STATUS_COLOR = {
+  Aprobado: '#10b981',
+  Rechazado: '#ef4444',
+  Pendiente: '#f59e0b',
+  Cancelado: '#6b7280',
+};
+
 const VacacionesTab = ({ currentUser, userCompanies }) => {
-  const isAdmin = currentUser?.isAdmin || currentUser?.is_admin || currentUser?.RolId === 2;
-  const [activeSection, setActiveSection] = useState('lista'); // 'lista', 'nueva', 'calendario', 'saldo', 'nomina', 'reportes'
+  const isAdmin = currentUser?.is_admin || currentUser?.isAdmin || currentUser?.RolId <= 2;
+  const userId = currentUser?.User_Id || currentUser?.user_id;
+  const companyId = currentUser?.companies?.[0] || userCompanies?.[0]?.Company_Id;
+
+  const [activeSection, setActiveSection] = useState('lista');
   const [solicitudes, setSolicitudes] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState({
-    estatus: '',
-    user_id: '',
-  });
+  const [submitting, setSubmitting] = useState(false);
 
-  const [formData, setFormData] = useState({
-    FechaInicio: '',
-    FechaFin: '',
-    Cantidad: 0,
-    Razon: '',
-    Observaciones: '',
-    LeaveTypeId: null,
-  });
+  const [filters, setFilters] = useState({ estatus: '', user_id: '', year: CURRENT_YEAR });
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [formError, setFormError] = useState(null);
+  const [diasCalculados, setDiasCalculados] = useState(null);
 
-  const [editingId, setEditingId] = useState(null);
   const [approvingId, setApprovingId] = useState(null);
-  const [approveData, setApproveData] = useState({
-    Estatus: 'Aprobado',
-    Observaciones: '',
-  });
+  const [approveData, setApproveData] = useState({ estatus: 'Aprobado', observaciones: '' });
 
-  // Cargar solicitudes
-  const loadSolicitudes = async () => {
+  // ── Cargar solicitudes ──────────────────────────────────────────────────────
+
+  const loadSolicitudes = useCallback(async () => {
     setLoading(true);
     try {
-      const filterObj = {
-        estatus: filters.estatus,
+      const params = {
+        estatus: filters.estatus || undefined,
+        year: filters.year || undefined,
       };
-      if (filters.user_id) {
-        filterObj.user_id = filters.user_id;
-      }
-      const data = await vacacionesService.list(filterObj);
-      setSolicitudes(data);
-    } catch (error) {
-      notify.error('Error al cargar solicitudes');
-      console.error(error);
+      if (isAdmin && filters.user_id) params.user_id = filters.user_id;
+
+      const data = await leaveService.listRequests(params);
+      setSolicitudes(Array.isArray(data) ? data : []);
+    } catch (err) {
+      notify.error(err?.response?.data?.detail || 'Error al cargar solicitudes');
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters, isAdmin]);
 
   useEffect(() => {
     loadSolicitudes();
   }, []);
 
-  // Cambiar filtro
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
-  };
+  // ── Calcular días hábiles en tiempo real ────────────────────────────────────
 
-  // Aplicar filtros
-  const handleApplyFilters = () => {
-    loadSolicitudes();
-  };
-
-  // Cambio de input en formulario
-  const handleFormChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  // Calcular días entre fechas
-  const calcularDias = () => {
-    if (formData.FechaInicio && formData.FechaFin) {
-      const inicio = new Date(formData.FechaInicio);
-      const fin = new Date(formData.FechaFin);
-      const diff = fin - inicio;
-      const dias = Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1; // +1 para incluir ambos días
-      setFormData(prev => ({ ...prev, Cantidad: Math.max(0, dias) }));
+  useEffect(() => {
+    if (!form.start_date || !form.end_date || !companyId) {
+      setDiasCalculados(null);
+      return;
     }
-  };
+    if (form.end_date < form.start_date) {
+      setDiasCalculados(null);
+      return;
+    }
+    leaveService.calculateWorkingDays(form.start_date, form.end_date, companyId)
+      .then(r => setDiasCalculados(r?.working_days ?? null))
+      .catch(() => setDiasCalculados(null));
+  }, [form.start_date, form.end_date, companyId]);
 
-  // Crear nueva solicitud
-  const handleSubmitForm = async (e) => {
+  // ── Crear solicitud ─────────────────────────────────────────────────────────
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setFormError(null);
 
-    if (!formData.FechaInicio || !formData.FechaFin || !formData.Cantidad) {
-      notify.error('Por favor completa los campos requeridos');
+    if (!form.leave_type_id) {
+      setFormError('Selecciona un tipo de licencia');
+      return;
+    }
+    if (!form.start_date || !form.end_date) {
+      setFormError('Las fechas son obligatorias');
+      return;
+    }
+    if (form.end_date < form.start_date) {
+      setFormError('La fecha de fin no puede ser anterior a la de inicio');
+      return;
+    }
+    if (form.start_date < TODAY) {
+      setFormError('No se pueden solicitar vacaciones con fecha en el pasado');
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
     try {
-      if (editingId) {
-        // Actualizar
-        await vacacionesService.update(editingId, formData);
-        notify.success('Solicitud actualizada correctamente');
-        setEditingId(null);
-      } else {
-        // Crear nueva
-        await vacacionesService.create(formData);
-        notify.success('Solicitud de vacaciones creada correctamente');
-      }
-
-      // Limpiar formulario
-      setFormData({
-        FechaInicio: '',
-        FechaFin: '',
-        Cantidad: 0,
-        Razon: '',
-        Observaciones: '',
+      await leaveService.createRequest({
+        user_id: userId,
+        leave_type_id: form.leave_type_id,
+        start_date: form.start_date,
+        end_date: form.end_date,
+        razon: form.razon || null,
       });
+      notify.success('Solicitud enviada correctamente');
+      setForm(EMPTY_FORM);
+      setDiasCalculados(null);
       setActiveSection('lista');
       loadSolicitudes();
-    } catch (error) {
-      notify.error(error.response?.data?.detail || 'Error al guardar solicitud');
+    } catch (err) {
+      const detail = err?.response?.data?.detail || '';
+      setFormError(detail || 'Error al crear la solicitud');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  // Editar solicitud
-  const handleEdit = async (solicitud) => {
-    if (solicitud.Estatus !== 'Pendiente') {
-      notify.error('Solo se pueden editar solicitudes pendientes');
-      return;
-    }
-    setFormData({
-      FechaInicio: solicitud.FechaInicio.split('T')[0],
-      FechaFin: solicitud.FechaFin.split('T')[0],
-      Cantidad: solicitud.Cantidad,
-      Razon: solicitud.Razon || '',
-      Observaciones: solicitud.Observaciones || '',
-    });
-    setEditingId(solicitud.Vacaciones_Id);
-    setActiveSection('nueva');
-  };
+  // ── Cancelar solicitud ──────────────────────────────────────────────────────
 
-  // Cancelar edición
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setFormData({
-      FechaInicio: '',
-      FechaFin: '',
-      Cantidad: 0,
-      Razon: '',
-      Observaciones: '',
-    });
-  };
-
-  // Aprobar solicitud — con mapeo automático a nómina si se aprueba
-  const handleApprove = async () => {
-    if (!approveData.Estatus) {
-      notify.error('Selecciona una acción (Aprobar/Rechazar)');
-      return;
-    }
-
+  const handleCancel = async (id, estatus) => {
+    if (!await confirm(`¿Cancelar esta solicitud${estatus === 'Aprobado' ? ' (ya estaba aprobada)' : ''}?`)) return;
     try {
-      await vacacionesService.approve(
-        approvingId,
-        approveData.Estatus,
-        approveData.Observaciones
-      );
-      notify.success(`Solicitud ${approveData.Estatus.toLowerCase()}`);
-
-      // Crear mapeo de nómina automáticamente cuando se aprueba
-      if (approveData.Estatus === 'Aprobado') {
-        try {
-          await api.post(`/rh/payroll/create-mapping?vacaciones_id=${approvingId}`);
-          notify.success('Mapeo de nómina creado automáticamente');
-        } catch (mapErr) {
-          // No bloquear si falla el mapeo — la aprobación ya se procesó
-          console.warn('No se pudo crear mapeo de nómina:', mapErr?.response?.data?.detail);
-        }
-      }
-
-      // Cancelar mapeo si se rechaza
-      if (approveData.Estatus === 'Rechazado') {
-        try {
-          await api.post(`/rh/payroll/cancel-mapping/${approvingId}`);
-        } catch {
-          // Silencioso — puede no existir mapeo previo
-        }
-      }
-
-      setApprovingId(null);
-      setApproveData({ Estatus: 'Aprobado', Observaciones: '' });
+      await leaveService.cancelRequest(id);
+      notify.success('Solicitud cancelada');
       loadSolicitudes();
-    } catch (error) {
-      notify.error(error.response?.data?.detail || 'Error al procesar solicitud');
+    } catch (err) {
+      notify.error(err?.response?.data?.detail || 'Error al cancelar');
     }
   };
 
-  // Eliminar solicitud
-  const handleDelete = async (id) => {
-    if (await confirm('¿Eliminar esta solicitud?')) {
-      try {
-        await vacacionesService.delete(id);
-        notify.success('Solicitud eliminada');
-        loadSolicitudes();
-      } catch (error) {
-        notify.error(error.response?.data?.detail || 'Error al eliminar');
-      }
+  // ── Aprobar / Rechazar ──────────────────────────────────────────────────────
+
+  const handleApprove = async () => {
+    try {
+      await leaveService.approveRequest(approvingId, {
+        estatus: approveData.estatus,
+        observaciones: approveData.observaciones || null,
+      });
+      notify.success(`Solicitud ${approveData.estatus.toLowerCase()}`);
+      setApprovingId(null);
+      setApproveData({ estatus: 'Aprobado', observaciones: '' });
+      loadSolicitudes();
+    } catch (err) {
+      notify.error(err?.response?.data?.detail || 'Error al procesar');
     }
   };
 
-  // Renderizar estado con color
-  const getStatusColor = (estatus) => {
-    switch (estatus) {
-      case 'Aprobado':
-        return '#10b981'; // green
-      case 'Rechazado':
-        return '#ef4444'; // red
-      case 'Pendiente':
-        return '#f59e0b'; // amber
-      default:
-        return '#6b7280'; // gray
-    }
-  };
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="vacaciones-container">
       {/* Tabs */}
       <div className="vacaciones-tabs">
-        <button
-          className={`tab-btn ${activeSection === 'lista' ? 'active' : ''}`}
-          onClick={() => setActiveSection('lista')}
-        >
-          📋 Mis Solicitudes
-        </button>
-        <button
-          className={`tab-btn ${activeSection === 'calendario' ? 'active' : ''}`}
-          onClick={() => setActiveSection('calendario')}
-        >
-          📅 Calendario
-        </button>
-        <button
-          className={`tab-btn ${activeSection === 'saldo' ? 'active' : ''}`}
-          onClick={() => setActiveSection('saldo')}
-        >
-          ⚖️ Saldo
-        </button>
-        <button
-          className={`tab-btn ${activeSection === 'nueva' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveSection('nueva');
-            handleCancelEdit();
-          }}
-        >
-          ➕ Nueva Solicitud
-        </button>
-        {isAdmin && (
+        {[
+          { key: 'lista', label: '📋 Solicitudes' },
+          { key: 'nueva', label: '➕ Nueva Solicitud' },
+          { key: 'calendario', label: '📅 Calendario' },
+          { key: 'saldo', label: '⚖️ Saldo' },
+          ...(isAdmin ? [{ key: 'nomina', label: '💰 Sync Nómina' }, { key: 'reportes', label: '📊 Reportes' }] : []),
+        ].map(t => (
           <button
-            className={`tab-btn ${activeSection === 'nomina' ? 'active' : ''}`}
-            onClick={() => setActiveSection('nomina')}
+            key={t.key}
+            className={`tab-btn ${activeSection === t.key ? 'active' : ''}`}
+            onClick={() => { setActiveSection(t.key); setFormError(null); }}
           >
-            💰 Sync Nómina
+            {t.label}
           </button>
-        )}
-        {isAdmin && (
-          <button
-            className={`tab-btn ${activeSection === 'reportes' ? 'active' : ''}`}
-            onClick={() => setActiveSection('reportes')}
-          >
-            📊 Reportes
-          </button>
-        )}
+        ))}
       </div>
 
-      {/* Sección: Lista de solicitudes */}
+      {/* ── LISTA ── */}
       {activeSection === 'lista' && (
         <div className="vacaciones-section">
-          <h3>📋 Mis Solicitudes de Vacaciones</h3>
+          <h3>📋 Solicitudes de Vacaciones</h3>
 
-          {/* Filtros */}
           <div className="vacaciones-filters">
             <select
-              name="estatus"
               value={filters.estatus}
-              onChange={handleFilterChange}
+              onChange={e => setFilters(f => ({ ...f, estatus: e.target.value }))}
               className="filter-select"
             >
               <option value="">Todos los estados</option>
               <option value="Pendiente">Pendiente</option>
               <option value="Aprobado">Aprobado</option>
               <option value="Rechazado">Rechazado</option>
+              <option value="Cancelado">Cancelado</option>
             </select>
-            <button onClick={handleApplyFilters} className="btn-filter">
-              🔍 Filtrar
-            </button>
+
+            <select
+              value={filters.year}
+              onChange={e => setFilters(f => ({ ...f, year: e.target.value }))}
+              className="filter-select"
+            >
+              {[CURRENT_YEAR + 1, CURRENT_YEAR, CURRENT_YEAR - 1].map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+
+            {isAdmin && (
+              <input
+                type="number"
+                placeholder="ID usuario (admin)"
+                className="filter-select"
+                style={{ width: 160 }}
+                value={filters.user_id}
+                onChange={e => setFilters(f => ({ ...f, user_id: e.target.value }))}
+                min="1"
+              />
+            )}
+
+            <button onClick={loadSolicitudes} className="btn-filter">🔍 Filtrar</button>
           </div>
 
-          {/* Tabla de solicitudes */}
           {loading ? (
             <p className="loading">Cargando...</p>
           ) : solicitudes.length === 0 ? (
-            <p className="empty">No hay solicitudes de vacaciones</p>
+            <p className="empty">No hay solicitudes para los filtros seleccionados</p>
           ) : (
             <div className="table-responsive">
               <table className="vacaciones-table">
                 <thead>
                   <tr>
+                    {isAdmin && <th>Empleado</th>}
+                    <th>Tipo</th>
                     <th>Período</th>
                     <th>Días</th>
                     <th>Razón</th>
                     <th>Estado</th>
-                    <th>Solicitado</th>
+                    <th>Fecha solicitud</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {solicitudes.map(sol => (
-                    <tr key={sol.Vacaciones_Id}>
+                    <tr key={sol.Vacaciones_Id || sol.id}>
+                      {isAdmin && (
+                        <td>
+                          <small>{sol.NombreEmpleado || sol.user_name || `#${sol.User_Id || sol.user_id}`}</small>
+                        </td>
+                      )}
+                      <td>
+                        <small>{sol.LeaveTypeName || sol.leave_type_name || '—'}</small>
+                      </td>
                       <td>
                         <small>
-                          {new Date(sol.FechaInicio).toLocaleDateString()} →{' '}
-                          {new Date(sol.FechaFin).toLocaleDateString()}
+                          {new Date(sol.FechaInicio || sol.start_date).toLocaleDateString()} →{' '}
+                          {new Date(sol.FechaFin || sol.end_date).toLocaleDateString()}
                         </small>
                       </td>
-                      <td className="text-center">{sol.Cantidad}</td>
-                      <td>{sol.Razon || '—'}</td>
+                      <td className="text-center">
+                        {sol.Cantidad || sol.days_count || '—'}
+                      </td>
+                      <td>{sol.Razon || sol.razon || '—'}</td>
                       <td>
                         <span
                           className="status-badge"
-                          style={{ backgroundColor: getStatusColor(sol.Estatus) }}
+                          style={{ backgroundColor: STATUS_COLOR[sol.Estatus || sol.status] || '#6b7280' }}
                         >
-                          {sol.Estatus}
+                          {sol.Estatus || sol.status}
                         </span>
                       </td>
                       <td>
                         <small>
-                          {new Date(sol.CreatedAt).toLocaleDateString()}
+                          {new Date(sol.CreatedAt || sol.created_at).toLocaleDateString()}
                         </small>
                       </td>
                       <td className="actions">
-                        {sol.Estatus === 'Pendiente' && (
-                          <>
-                            <button
-                              className="btn-sm btn-edit"
-                              onClick={() => handleEdit(sol)}
-                              title="Editar"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              className="btn-sm btn-delete"
-                              onClick={() => handleDelete(sol.Vacaciones_Id)}
-                              title="Eliminar"
-                            >
-                              🗑️
-                            </button>
-                          </>
+                        {isAdmin && (sol.Estatus || sol.status) === 'Pendiente' && (
+                          <button
+                            className="btn-sm btn-edit"
+                            title="Aprobar / Rechazar"
+                            onClick={() => setApprovingId(sol.Vacaciones_Id || sol.id)}
+                          >
+                            ✅
+                          </button>
                         )}
-                        <button
-                          className="btn-sm btn-info"
-                          onClick={() => {
-                            alert(
-                              `Solicitud de ${sol.Cantidad} días\n` +
-                              `Período: ${new Date(sol.FechaInicio).toLocaleDateString()} a ${new Date(sol.FechaFin).toLocaleDateString()}\n` +
-                              `Estado: ${sol.Estatus}\n` +
-                              `Observaciones: ${sol.Observaciones || 'Sin observaciones'}`
-                            );
-                          }}
-                          title="Ver detalles"
-                        >
-                          ℹ️
-                        </button>
+                        {['Pendiente', 'Aprobado'].includes(sol.Estatus || sol.status) && (
+                          <button
+                            className="btn-sm btn-delete"
+                            title="Cancelar solicitud"
+                            onClick={() => handleCancel(
+                              sol.Vacaciones_Id || sol.id,
+                              sol.Estatus || sol.status
+                            )}
+                          >
+                            🚫
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -383,123 +310,131 @@ const VacacionesTab = ({ currentUser, userCompanies }) => {
         </div>
       )}
 
-      {/* Sección: Nueva solicitud */}
+      {/* ── NUEVA SOLICITUD ── */}
       {activeSection === 'nueva' && (
         <div className="vacaciones-section">
-          <h3>{editingId ? '✏️ Editar Solicitud' : '➕ Nueva Solicitud de Vacaciones'}</h3>
+          <h3>➕ Nueva Solicitud de Vacaciones</h3>
 
-          <form onSubmit={handleSubmitForm} className="vacaciones-form">
+          {formError && (
+            <div className="form-error-banner">
+              ⚠️ {formError}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="vacaciones-form">
             <div className="form-group">
               <label>Tipo de Licencia <span className="required">*</span></label>
-              <LeaveTypeSelector 
-                companyId={currentUser?.company_id || userCompanies?.[0]?.Company_Id}
-                value={formData.LeaveTypeId}
-                onChange={(typeId, typeData) => {
-                  setFormData(prev => ({ 
-                    ...prev, 
-                    LeaveTypeId: typeId 
-                  }));
-                }}
+              <LeaveTypeSelector
+                companyId={companyId}
+                value={form.leave_type_id}
+                onChange={(typeId) => setForm(f => ({ ...f, leave_type_id: typeId }))}
               />
             </div>
 
-            <div className="form-group">
-              <label htmlFor="FechaInicio">
-                Fecha Inicio <span className="required">*</span>
-              </label>
-              <input
-                type="date"
-                id="FechaInicio"
-                name="FechaInicio"
-                value={formData.FechaInicio}
-                onChange={handleFormChange}
-                onBlur={calcularDias}
-                required
-              />
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="start_date">Fecha Inicio <span className="required">*</span></label>
+                <input
+                  type="date"
+                  id="start_date"
+                  value={form.start_date}
+                  min={TODAY}
+                  onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="end_date">Fecha Fin <span className="required">*</span></label>
+                <input
+                  type="date"
+                  id="end_date"
+                  value={form.end_date}
+                  min={form.start_date || TODAY}
+                  onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))}
+                  required
+                />
+              </div>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="FechaFin">
-                Fecha Fin <span className="required">*</span>
-              </label>
-              <input
-                type="date"
-                id="FechaFin"
-                name="FechaFin"
-                value={formData.FechaFin}
-                onChange={handleFormChange}
-                onBlur={calcularDias}
-                required
-              />
-            </div>
+            {diasCalculados !== null && (
+              <div className="dias-calculados">
+                📅 <strong>{diasCalculados} días hábiles</strong> en el período seleccionado
+              </div>
+            )}
 
             <div className="form-group">
-              <label htmlFor="Cantidad">
-                Días a Solicitar <span className="required">*</span>
-              </label>
-              <input
-                type="number"
-                id="Cantidad"
-                name="Cantidad"
-                value={formData.Cantidad}
-                onChange={handleFormChange}
-                min="1"
-                required
-              />
-              <small>Se calcula automáticamente según las fechas</small>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="Razon">Razón del Descanso</label>
+              <label htmlFor="razon">Razón (opcional)</label>
               <input
                 type="text"
-                id="Razon"
-                name="Razon"
-                value={formData.Razon}
-                onChange={handleFormChange}
-                placeholder="Ej: Descanso personal, vacaciones familiares..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="Observaciones">Observaciones Adicionales</label>
-              <textarea
-                id="Observaciones"
-                name="Observaciones"
-                value={formData.Observaciones}
-                onChange={handleFormChange}
-                rows="4"
-                placeholder="Información adicional que consideres relevante..."
+                id="razon"
+                value={form.razon}
+                onChange={e => setForm(f => ({ ...f, razon: e.target.value }))}
+                placeholder="Ej: Vacaciones familiares, descanso personal..."
+                maxLength={500}
               />
             </div>
 
             <div className="form-actions">
-              <button type="submit" className="btn btn-primary" disabled={loading}>
-                {loading ? '⏳ Guardando...' : '✅ Enviar Solicitud'}
+              <button type="submit" className="btn btn-primary" disabled={submitting}>
+                {submitting ? '⏳ Enviando...' : '✅ Enviar Solicitud'}
               </button>
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={handleCancelEdit}
+                onClick={() => { setForm(EMPTY_FORM); setFormError(null); setDiasCalculados(null); }}
               >
-                ❌ Cancelar
+                Limpiar
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Modal de aprobación */}
+      {/* ── CALENDARIO ── */}
+      {activeSection === 'calendario' && (
+        <div className="vacaciones-section">
+          <h3>📅 Calendario de Vacaciones</h3>
+          <VacacionesCalendar
+            currentUser={currentUser}
+            onCreateClick={() => setActiveSection('nueva')}
+          />
+        </div>
+      )}
+
+      {/* ── SALDO ── */}
+      {activeSection === 'saldo' && (
+        <div className="vacaciones-section">
+          <h3>⚖️ Mi Saldo de Vacaciones</h3>
+          <BalanceWidget userId={userId} year={CURRENT_YEAR} />
+        </div>
+      )}
+
+      {/* ── NÓMINA (solo admin) ── */}
+      {activeSection === 'nomina' && isAdmin && (
+        <div className="vacaciones-section">
+          <PayrollSyncPanel />
+        </div>
+      )}
+
+      {/* ── REPORTES (solo admin) ── */}
+      {activeSection === 'reportes' && isAdmin && (
+        <div className="vacaciones-section">
+          <VacacionesReports currentUser={currentUser} />
+        </div>
+      )}
+
+      {/* ── MODAL APROBAR/RECHAZAR ── */}
       {approvingId && (
         <div className="modal-overlay" onClick={() => setApprovingId(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h4>Procesar Solicitud de Vacaciones</h4>
+            <h4>Procesar Solicitud #{approvingId}</h4>
 
             <div className="form-group">
               <label>Acción</label>
               <select
-                value={approveData.Estatus}
-                onChange={e => setApproveData(prev => ({ ...prev, Estatus: e.target.value }))}
+                value={approveData.estatus}
+                onChange={e => setApproveData(p => ({ ...p, estatus: e.target.value }))}
                 className="full-width"
               >
                 <option value="Aprobado">✅ Aprobar</option>
@@ -510,61 +445,18 @@ const VacacionesTab = ({ currentUser, userCompanies }) => {
             <div className="form-group">
               <label>Observaciones</label>
               <textarea
-                value={approveData.Observaciones}
-                onChange={e => setApproveData(prev => ({ ...prev, Observaciones: e.target.value }))}
+                value={approveData.observaciones}
+                onChange={e => setApproveData(p => ({ ...p, observaciones: e.target.value }))}
                 rows="3"
-                placeholder="Escribe tus observaciones aquí..."
+                placeholder="Motivo del rechazo u observaciones..."
               />
             </div>
 
             <div className="modal-actions">
-              <button onClick={handleApprove} className="btn btn-success">
-                Confirmar
-              </button>
-              <button
-                onClick={() => setApprovingId(null)}
-                className="btn btn-secondary"
-              >
-                Cancelar
-              </button>
+              <button onClick={handleApprove} className="btn btn-success">Confirmar</button>
+              <button onClick={() => setApprovingId(null)} className="btn btn-secondary">Cancelar</button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Sección: Calendario */}
-      {activeSection === 'calendario' && (
-        <div className="vacaciones-section">
-          <h3>📅 Calendario de Vacaciones</h3>
-          <VacacionesCalendar 
-            currentUser={currentUser}
-            onCreateClick={() => setActiveSection('nueva')}
-          />
-        </div>
-      )}
-
-      {/* Sección: Saldo */}
-      {activeSection === 'saldo' && (
-        <div className="vacaciones-section">
-          <h3>⚖️ Mi Saldo de Vacaciones</h3>
-          <BalanceWidget
-            userId={currentUser?.user_id || currentUser?.User_Id}
-            year={new Date().getFullYear()}
-          />
-        </div>
-      )}
-
-      {/* Sección: Sync Nómina (solo admins) */}
-      {activeSection === 'nomina' && isAdmin && (
-        <div className="vacaciones-section">
-          <PayrollSyncPanel />
-        </div>
-      )}
-
-      {/* Sección: Reportes analytics (solo admins) */}
-      {activeSection === 'reportes' && isAdmin && (
-        <div className="vacaciones-section">
-          <VacacionesReports currentUser={currentUser} />
         </div>
       )}
     </div>

@@ -84,7 +84,29 @@ export const checkBalanceAvailability = async (leaveTypeId, daysRequested, year 
   return response.data;
 };
 
-// ── Vacaciones – solicitudes ─────────────────────────────────────────────────
+// ── Solicitudes de licencia/vacaciones (nuevo backend /rh/leave/requests) ────
+
+export const createRequest = async (data) => {
+  const response = await api.post(`${BASE}/requests`, data);
+  return response.data;
+};
+
+export const listRequests = async (params = {}) => {
+  const response = await api.get(`${BASE}/requests`, { params });
+  return response.data;
+};
+
+export const approveRequest = async (vacacionesId, body) => {
+  const response = await api.patch(`${BASE}/requests/${vacacionesId}/aprobar`, body);
+  return response.data;
+};
+
+export const cancelRequest = async (vacacionesId) => {
+  const response = await api.patch(`${BASE}/requests/${vacacionesId}/cancelar`);
+  return response.data;
+};
+
+// ── Compatibilidad — funciones legacy que apuntan al endpoint antiguo ────────
 
 export const createVacationRequest = async (data) => {
   const response = await api.post('/rh/vacaciones', data);
@@ -146,6 +168,7 @@ export default {
   getLeaveBalance, getEmployeeBalance,
   getPublicHolidays, createPublicHoliday,
   isWorkingDay, calculateWorkingDays, checkBalanceAvailability,
+  createRequest, listRequests, approveRequest, cancelRequest,
   createVacationRequest, getApprovedVacations, getUserVacations,
   getPendingVacations, approveVacation, rejectVacation,
   getMockLeaveTypes, getMockBalance, getMockApprovedVacations

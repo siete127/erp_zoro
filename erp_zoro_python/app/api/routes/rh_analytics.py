@@ -145,8 +145,8 @@ def analytics_by_employee(
     Top empleados con más días de vacaciones aprobados.
     Requiere permisos de admin.
     """
-    is_admin = current_user.get("isAdmin", False)
-    is_super = current_user.get("isSuperAdmin", False)
+    is_admin = current_user.get("is_admin", False)
+    is_super = current_user.get("is_super_admin", False)
     if not is_admin and not is_super:
         raise HTTPException(status_code=403, detail="Se requieren permisos de admin")
 
@@ -202,8 +202,8 @@ def analytics_pending_list(
     Lista detallada de solicitudes pendientes de aprobación.
     Requiere permisos de admin.
     """
-    is_admin = current_user.get("isAdmin", False)
-    is_super = current_user.get("isSuperAdmin", False)
+    is_admin = current_user.get("is_admin", False)
+    is_super = current_user.get("is_super_admin", False)
     if not is_admin and not is_super:
         raise HTTPException(status_code=403, detail="Se requieren permisos de admin")
 

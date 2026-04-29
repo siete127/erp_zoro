@@ -1,0 +1,21 @@
+# Normalize line endings
+* text=auto eol=lf
+
+# Force binary — never touch these
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.zip binary
+*.rar binary
+*.7z binary
+*.tar binary
+*.gz binary
+*.pdf binary
+*.xlsx binary
+*.docx binary

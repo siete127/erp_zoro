@@ -20,8 +20,8 @@ router = APIRouter()
 
 
 def _check_access(current_user: dict, target_user_id: int):
-    is_super = current_user.get("isSuperAdmin", False)
-    is_admin = current_user.get("isAdmin", False)
+    is_super = current_user.get("is_super_admin", False)
+    is_admin = current_user.get("is_admin", False)
     companies = current_user.get("companies", [])
     user_id = current_user.get("User_Id")
     if not svc._can_access_user(user_id, target_user_id, companies, is_super, is_admin):
@@ -35,8 +35,8 @@ def list_perfiles(
     company_id: Optional[int] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    is_super = current_user.get("isSuperAdmin", False)
-    is_admin = current_user.get("isAdmin", False)
+    is_super = current_user.get("is_super_admin", False)
+    is_admin = current_user.get("is_admin", False)
     companies = current_user.get("companies", [])
     user_id = current_user.get("User_Id")
     return svc.list_perfiles(user_id, companies, is_super, is_admin, company_id)
@@ -159,8 +159,8 @@ def list_vacaciones(
     current_user: dict = Depends(get_current_user),
 ):
     """Listar solicitudes de vacaciones con filtros."""
-    is_super = current_user.get("isSuperAdmin", False)
-    is_admin = current_user.get("isAdmin", False)
+    is_super = current_user.get("is_super_admin", False)
+    is_admin = current_user.get("is_admin", False)
     companies = current_user.get("companies", [])
     user_id_actual = current_user.get("User_Id")
     return svc.list_vacaciones(
@@ -222,8 +222,8 @@ def aprobar_vacaciones(
     current_user: dict = Depends(get_current_user),
 ):
     """Aprobar o rechazar solicitud de vacaciones (solo admins/superadmins)."""
-    is_admin = current_user.get("isAdmin", False)
-    is_super = current_user.get("isSuperAdmin", False)
+    is_admin = current_user.get("is_admin", False)
+    is_super = current_user.get("is_super_admin", False)
     if not is_admin and not is_super:
         raise HTTPException(status_code=403, detail="No tiene permisos para aprobar vacaciones")
 

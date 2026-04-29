@@ -342,8 +342,40 @@
   content: '📭 ';
 }
 
+/* Error banner en formulario */
+.form-error-banner {
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  color: #b91c1c;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+/* Fila de 2 columnas en el formulario */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Contador de días hábiles calculados */
+.dias-calculados {
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  color: #1d4ed8;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
   .vacaciones-container {
     padding: 15px;
   }

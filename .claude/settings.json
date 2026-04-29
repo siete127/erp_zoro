@@ -47,7 +47,19 @@
       "Bash(python -c \"from app.api.routes.rh import router; print\\('rh.py OK'\\)\")",
       "Bash(python -c \"from app.api.routes.payroll_integration import router; print\\('payroll_integration.py OK'\\)\")",
       "Bash(python -c \"from app.api.router import api_router; print\\('Full router OK'\\)\")",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Read(//c/Users/diazj/OneDrive/Escritorio/ERP_PROYECTOerp_zoro_python/app/services/**)",
+      "Bash(python -c \"from app.api.router import api_router; print\\('Backend OK'\\)\")",
+      "Read(//c/c/Users/diazj/OneDrive/Escritorio/**)",
+      "Read(//c/c/Users/diazj/OneDrive/Escritorio/ERP_PROYECTO/**)",
+      "Bash(mkdir -p scripts)",
+      "Bash(mv create_vacation_table.py scripts/)",
+      "Bash(mv create_vacation_table_v2.py scripts/)",
+      "Bash(mv setup_vacation_table.py scripts/)",
+      "Bash(mv setup_payroll_leave_mapping.py scripts/)",
+      "Bash(python -m pytest app/tests/ --collect-only)",
+      "Bash(python -m pytest app/tests/ -v)",
+      "Bash(echo \"EXIT: $?\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\diazj\\.claude\\projects\\c--Users-diazj-OneDrive-Escritorio-ERP-PROYECTO\\memory",
