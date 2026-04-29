@@ -139,8 +139,7 @@ export default function UserPermissions({ userId, userName, onClose }) {
     if (!normalizedUserId) return;
     try {
       const { data } = await api.get(`/users/${normalizedUserId}`);
-      const roleName = data.RolName || '';
-      setIsAdmin(/administrador|admin/i.test(roleName));
+      setIsAdmin(data.RolId !== undefined ? Number(data.RolId) <= 2 : false);
     } catch {}
   };
 
