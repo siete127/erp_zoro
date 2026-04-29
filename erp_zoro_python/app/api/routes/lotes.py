@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from app.api.deps import get_current_user
-from app.services import lote_service
+import app.services.lote_service as lote_service
 
 
 router = APIRouter()
